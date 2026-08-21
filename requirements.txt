@@ -1,0 +1,9 @@
+PHP >= 8.1
+MySQL >= 8.0 / MariaDB >= 10.4
+PHP Extensions:
+  - ext-pdo
+  - ext-pdo_mysql
+  - ext-openssl
+  - ext-mbstring
+  - ext-gd (for 2FA QR code generation)
+Composer (for dependency management)
