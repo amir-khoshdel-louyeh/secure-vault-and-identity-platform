@@ -1,0 +1,9 @@
+{
+    "name": "secure-vault/app",
+    "description": "A secure web application for storing and sharing encrypted files and notes with 2FA.",
+    "type": "project",
+    "require": {
+        "php": ">=8.1",
+        "robthree/twofactorauth": "^2.0"
+    }
+}
