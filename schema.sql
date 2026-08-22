@@ -36,3 +36,27 @@ CREATE TABLE IF NOT EXISTS `files` (
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 4. جدول توکن‌های اشتراک‌گذاری زمان‌دار (فایل و نوت)
+CREATE TABLE IF NOT EXISTS `share_tokens` (
+  `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `item_type` ENUM('file', 'note') NOT NULL,
+  `item_id` INT UNSIGNED NOT NULL,
+  `token` VARCHAR(64) NOT NULL UNIQUE,
+  `expires_at` DATETIME NOT NULL,
+  `max_uses` INT UNSIGNED DEFAULT 1,
+  `uses_count` INT UNSIGNED DEFAULT 0,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX `idx_token` (`token`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 5. جدول لاگ‌های امنیتی (Audit Logs)
+CREATE TABLE IF NOT EXISTS `audit_logs` (
+  `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `user_id` INT UNSIGNED DEFAULT NULL,
+  `action` VARCHAR(100) NOT NULL,
+  `ip_address` VARCHAR(45) NOT NULL,
+  `user_agent` TEXT DEFAULT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
