@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
-require_once __DIR__ . '/Crypto.php';
+require_once __DIR__ . '/crypto.php';
 
 class ShareManager {
     private PDO $db;
