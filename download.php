@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/ShareManager.php';
+require_once __DIR__ . '/sharemanager.php';
 
 $token = $_GET['token'] ?? '';
 $token = trim($token);
