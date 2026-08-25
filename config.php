@@ -8,10 +8,10 @@ if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
 // -----------------------------------------------------------------------------
 // ۱. تنظیمات پایگاه داده (Database Configuration)
 // -----------------------------------------------------------------------------
-define('DB_HOST', '127.0.0.1');
+define('DB_HOST', 'localhost');
 define('DB_NAME', 'secure_vault');
-define('DB_USER', 'root');
-define('DB_PASS', ''); // در محیط توسعه؛ پسورد دیتابیس خود را قرار دهید
+define('DB_USER', 'vault_user');
+define('DB_PASS', 'VaultSecret123!');
 
 // -----------------------------------------------------------------------------
 // ۲. تنظیمات رمزنگاری متمرکز (Encryption Configuration)
