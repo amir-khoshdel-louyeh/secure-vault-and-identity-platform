@@ -110,20 +110,25 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (registerForm) {
-        registerForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const formData = new FormData(registerForm);
-            const res = await apiRequest('register', 'POST', formData);
+    registerForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(registerForm);
+        const res = await apiRequest('register', 'POST', formData);
 
-            if (res && res.success) {
-                alert(res.message);
-                if (res.secret) {
-                    alert(`کلید TOTP شما: ${res.secret}\nآن را در نرم‌افزار Authenticator وارد کنید.`);
-                }
-            } else if (res) {
-                alert(res.message);
+        if (res && res.success) {
+            if (res.secret) {
+                prompt(
+                    `ثبت‌نام با موفقیت انجام شد!\n\nکلید TOTP شما در زیر قرار دارد. آن را کپی کرده و در Google Authenticator اضافه کنید:`,
+                    res.secret
+                );
+            } else {
+                alert(res.message + ' (هشدار: کلید TOTP دریافت نشد)');
             }
-        });
+            registerForm.reset();
+        } else if (res) {
+            alert(res.message);
+        }
+    });
     }
 
     if (logoutBtn) {

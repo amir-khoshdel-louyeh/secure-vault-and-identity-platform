@@ -67,16 +67,19 @@ if ($action === 'register') {
     $email    = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
 
-    // اگر ایمیل ارسال نشده بود، یک ایمیل پیش‌فرض بر پایه نام کاربری می‌سازد
     if (empty($email) && !empty($username)) {
         $email = $username . '@vault.local';
     }
 
     $result = $auth->register($username, $email, $password);
     if ($result['success']) {
+        // دریافت کلید secret از نام‌های مختلف احتمالی در آرایه خروجی
+        $secret = $result['secret'] ?? $result['totp_secret'] ?? $result['data']['secret'] ?? null;
+        $qrCode = $result['qr_code_url'] ?? $result['qr_code'] ?? null;
+
         sendJsonResponse(true, $result['message'], [
-            'qr_code_url' => $result['qr_code_url'] ?? null,
-            'secret'      => $result['secret'] ?? null
+            'secret'      => $secret,
+            'qr_code_url' => $qrCode
         ]);
     } else {
         sendJsonResponse(false, $result['message'], [], 400);
