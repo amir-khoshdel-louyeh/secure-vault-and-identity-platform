@@ -80,11 +80,19 @@ if ($action === 'register') {
 // ==========================================
 // ۴. بررسی احراز هویت برای سایر مسیرها
 // ==========================================
-if (!$auth->isLoggedIn()) {
+// پشتیبانی از هر دو متد isLoggedIn و check جهت جلوگیری از خطای Fatal Error
+$isLoggedIn = method_exists($auth, 'isLoggedIn') ? $auth->isLoggedIn() : (method_exists($auth, 'check') ? $auth->check() : isset($_SESSION['user_id']));
+
+if (!$isLoggedIn) {
     sendJsonResponse(false, 'لطفا ابتدا وارد حساب کاربری خود شوید.', [], 401);
 }
 
 $userId = $_SESSION['user_id'];
+
+// ساخت توکن CSRF در صورت عدم وجود
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
 
 // ==========================================
 // ۵. اعتبارسنجی توکن CSRF (برای درخواست‌های تغییر دهنده POST)
@@ -100,6 +108,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // ۶. مسیریابی درخواست‌های احرازهویت‌شده
 // ==========================================
 try {
+    $vault = new Vault();
+
     switch ($action) {
 
         // --- خروج از حساب ---
@@ -117,55 +127,48 @@ try {
             ]);
             break;
 
-        // --- مدیریت فایل‌ها ---
+        // --- مدیریت فایل‌ها (با استفاده از کلاس Vault) ---
         case 'upload_file':
             if (!isset($_FILES['file'])) {
                 sendJsonResponse(false, 'فایلی ارسال نشده است.', [], 400);
             }
-            $fileManager = new FileManager();
-            $res = $fileManager->uploadFile($userId, $_FILES['file']);
+            $res = $vault->uploadFile($userId, $_FILES['file']);
             sendJsonResponse($res['success'], $res['message'], $res['success'] ? ['file_id' => $res['file_id']] : [], $res['success'] ? 200 : 400);
             break;
 
         case 'list_files':
-            $fileManager = new FileManager();
-            $files = $fileManager->getUserFiles($userId);
+            $files = $vault->getUserFiles($userId);
             sendJsonResponse(true, 'لیست فایل‌ها دریافت شد.', ['files' => $files]);
             break;
 
         case 'delete_file':
             $fileId = (int)($_POST['file_id'] ?? 0);
-            $fileManager = new FileManager();
-            $res = $fileManager->deleteFile($userId, $fileId);
+            $res = $vault->deleteFile($userId, $fileId);
             sendJsonResponse($res['success'], $res['message'], [], $res['success'] ? 200 : 400);
             break;
 
-        // --- مدیریت یادداشت‌ها ---
+        // --- مدیریت یادداشت‌ها (با استفاده از کلاس Vault) ---
         case 'create_note':
             $title   = trim($_POST['title'] ?? '');
             $content = $_POST['content'] ?? '';
-            $noteManager = new NoteManager();
-            $res = $noteManager->createNote($userId, $title, $content);
+            $res = $vault->createNote($userId, $title, $content);
             sendJsonResponse($res['success'], $res['message'], $res['success'] ? ['note_id' => $res['note_id']] : [], $res['success'] ? 200 : 400);
             break;
 
         case 'list_notes':
-            $noteManager = new NoteManager();
-            $notes = $noteManager->getUserNotes($userId);
+            $notes = $vault->getUserNotes($userId);
             sendJsonResponse(true, 'لیست یادداشت‌ها دریافت شد.', ['notes' => $notes]);
             break;
 
         case 'get_note':
             $noteId = (int)($_GET['note_id'] ?? 0);
-            $noteManager = new NoteManager();
-            $res = $noteManager->getNoteContent($userId, $noteId);
+            $res = $vault->getNoteContent($userId, $noteId);
             sendJsonResponse($res['success'], $res['message'], $res['success'] ? ['note' => $res['note']] : [], $res['success'] ? 200 : 404);
             break;
 
         case 'delete_note':
             $noteId = (int)($_POST['note_id'] ?? 0);
-            $noteManager = new NoteManager();
-            $res = $noteManager->deleteNote($userId, $noteId);
+            $res = $vault->deleteNote($userId, $noteId);
             sendJsonResponse($res['success'], $res['message'], [], $res['success'] ? 200 : 400);
             break;
 
