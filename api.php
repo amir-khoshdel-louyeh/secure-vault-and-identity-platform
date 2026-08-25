@@ -64,9 +64,15 @@ if ($action === 'register') {
     }
 
     $username = trim($_POST['username'] ?? '');
+    $email    = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
 
-    $result = $auth->register($username, $password);
+    // اگر ایمیل ارسال نشده بود، یک ایمیل پیش‌فرض بر پایه نام کاربری می‌سازد
+    if (empty($email) && !empty($username)) {
+        $email = $username . '@vault.local';
+    }
+
+    $result = $auth->register($username, $email, $password);
     if ($result['success']) {
         sendJsonResponse(true, $result['message'], [
             'qr_code_url' => $result['qr_code_url'] ?? null,
