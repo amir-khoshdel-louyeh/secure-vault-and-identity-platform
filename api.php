@@ -45,15 +45,13 @@ if ($action === 'login') {
 
     $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
-    $totpCode = trim($_POST['totp_code'] ?? '');
+    $totpCode = trim($_POST['totp_code'] ?? $_POST['totp'] ?? '');
 
     $result = $auth->login($username, $password, $totpCode);
     if ($result['success']) {
-        // ایجاد توکن CSRF جدید پس از ورود موفق
-        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-        sendJsonResponse(true, $result['message'], ['csrf_token' => $_SESSION['csrf_token']]);
+        sendJsonResponse(true, $result['message']);
     } else {
-        sendJsonResponse(false, $result['message'], [], 401);
+        sendJsonResponse(false, $result['message'], [], 400);
     }
 }
 
