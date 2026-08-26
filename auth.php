@@ -39,17 +39,25 @@ class Auth {
             return ['success' => false, 'message' => 'نام کاربری یا ایمیل قبلا ثبت شده است.'];
         }
 
-        // ۳. هش کردن پسورد با Bcrypt / Argon2id
+        // ۳. هش کردن پسورد با Bcrypt
         $passwordHash = password_hash($password, PASSWORD_BCRYPT, ['cost' => 12]);
 
-        // ۴. ذخیره در دیتابیس
-        $stmt = $this->db->prepare("INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)");
-        $stmt->execute([$username, $email, $passwordHash]);
+        // ۴. تولید کلید اختصاصی TOTP
+        $totpSecret = $this->generateTotpSecret();
+
+        // ۵. ذخیره در دیتابیس (ارسال totp_secret)
+        $stmt = $this->db->prepare("INSERT INTO users (username, email, password_hash, totp_secret) VALUES (?, ?, ?, ?)");
+        $stmt->execute([$username, $email, $passwordHash, $totpSecret]);
         $userId = (int)$this->db->lastInsertId();
 
         $this->logAction($userId, 'USER_REGISTERED');
 
-        return ['success' => true, 'message' => 'ثبت‌نام با موفقیت انجام شد.'];
+        // ۶. بازگرداندن کلید secret برای فرانت‌اند
+        return [
+            'success' => true,
+            'message' => 'ثبت‌نام با موفقیت انجام شد.',
+            'secret'  => $totpSecret
+        ];
     }
 
     /**
@@ -194,4 +202,12 @@ class Auth {
         $stmt = $this->db->prepare("INSERT INTO audit_logs (user_id, action, ip_address, user_agent) VALUES (?, ?, ?, ?)");
         $stmt->execute([$userId, $action, $ip, $agent]);
     }
+    private function generateTotpSecret(int $length = 16): string {
+    $base32Chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+    $secret = '';
+    for ($i = 0; $i < $length; $i++) {
+        $secret .= $base32Chars[random_int(0, 31)];
+    }
+    return $secret;
+}
 }
