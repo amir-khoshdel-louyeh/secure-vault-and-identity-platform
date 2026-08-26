@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Secure Vault Platform</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="container">
+        <!-- Main Header -->
+        <header>
+            <h1>Secure Vault & Identity Platform</h1>
+            <div id="user-bar">
+                <span id="welcome-user"></span>
+                <button id="logout-btn" class="btn-danger">Sign Out</button>
+            </div>
+        </header>
+
+        <!-- Dashboard Section -->
+        <section id="dashboard-section">
+            
+            <!-- Encrypted Files Management -->
+            <div class="card">
+                <h3>File Management (AES-256 Encryption)</h3>
+                
+                <form id="upload-file-form" class="inline-form" enctype="multipart/form-data">
+                    <input type="file" name="file" required>
+                    <button type="submit" class="btn-primary">Upload Secure File</button>
+                </form>
+
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>File Name</th>
+                                <th>Size</th>
+                                <th>Upload Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="files-list">
+                            <!-- File items populated dynamically by app.js -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Encrypted Notes Management -->
+            <div class="card">
+                <h3>Secure Notes Management</h3>
+                
+                <form id="create-note-form">
+                    <div class="form-group">
+                        <input type="text" name="title" placeholder="Note Title..." required>
+                    </div>
+                    <div class="form-group">
+                        <textarea name="content" rows="4" placeholder="Confidential note content..." required></textarea>
+                    </div>
+                    <button type="submit" class="btn-primary">Save Encrypted Note</button>
+                </form>
+
+                <div id="notes-list" class="notes-grid">
+                    <!-- Note items populated dynamically by app.js -->
+                </div>
+            </div>
+
+        </section>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
