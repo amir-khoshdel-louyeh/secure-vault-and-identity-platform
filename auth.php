@@ -209,5 +209,77 @@ class Auth {
         $secret .= $base32Chars[random_int(0, 31)];
     }
     return $secret;
-}
+    }
+
+    private function verifyTotpCode(string $secret, string $code): bool {
+        if (strlen($code) !== 6 || !ctype_digit($code)) {
+            return false;
+        }
+
+        $base32Chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+        $secret = strtoupper($secret);
+        $binarySecret = '';
+        
+        for ($i = 0; $i < strlen($secret); $i++) {
+            $position = strpos($base32Chars, $secret[$i]);
+            if ($position === false) continue;
+            $binarySecret .= sprintf('%05b', $position);
+        }
+        
+        $secretKey = '';
+        for ($i = 0; $i + 8 <= strlen($binarySecret); $i += 8) {
+            $secretKey .= chr(bindec(substr($binarySecret, $i, 8)));
+        }
+
+        $timeSlice = floor(time() / 30);
+
+        // بررسی پنجره زمانی (یک بازه قبل، زمان جاری، یک بازه بعد) جهت جبران اختلاف زمان
+        for ($i = -1; $i <= 1; $i++) {
+            $packedTime = pack('N*', 0) . pack('N*', $timeSlice + $i);
+            $hash = hash_hmac('sha1', $packedTime, $secretKey, true);
+            $offset = ord($hash[19]) & 0xf;
+            $calculatedCode = (
+                ((ord($hash[$offset]) & 0x7f) << 24) |
+                ((ord($hash[$offset + 1]) & 0xff) << 16) |
+                ((ord($hash[$offset + 2]) & 0xff) << 8) |
+                (ord($hash[$offset + 3]) & 0xff)
+            ) % 1000000;
+
+            if (str_pad((string)$calculatedCode, 6, '0', STR_PAD_LEFT) === $code) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+
+    public function login(string $username, string $password, string $totpCode): array {
+        if (empty($username) || empty($password) || empty($totpCode)) {
+            return ['success' => false, 'message' => 'لطفاً نام کاربری، رمز عبور و کد TOTP را وارد کنید.'];
+        }
+
+        $stmt = $this->db->prepare("SELECT id, username, password_hash, totp_secret FROM users WHERE username = ? OR email = ?");
+        $stmt->execute([$username, $username]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$user || !password_verify($password, $user['password_hash'])) {
+            return ['success' => false, 'message' => 'نام کاربری یا رمز عبور اشتباه است.'];
+        }
+
+        if (empty($user['totp_secret']) || !$this->verifyTotpCode($user['totp_secret'], $totpCode)) {
+            return ['success' => false, 'message' => 'کد TOTP نامعتبر یا منقضی شده است.'];
+        }
+
+        // تنظیم نشست کاربر
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        $_SESSION['user_id'] = $user['id'];
+        $_SESSION['username'] = $user['username'];
+
+        $this->logAction((int)$user['id'], 'USER_LOGIN');
+
+        return ['success' => true, 'message' => 'ورود با موفقیت انجام شد.'];
+    }
 }
