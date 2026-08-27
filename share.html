@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Share Link - Secure Vault Platform</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="container">
+        <!-- Main Header -->
+        <header>
+            <h1>Secure Vault & Identity Platform</h1>
+            <div id="user-bar">
+                <a href="dashboard.html" class="btn-secondary">Back to Dashboard</a>
+            </div>
+        </header>
+
+        <!-- Share Section / Card Container -->
+        <section id="share-section">
+            <div class="card">
+                <h3>Create Secure Share Link</h3>
+                
+                <form id="share-form">
+                    <input type="hidden" id="share-item-type" name="item_type">
+                    <input type="hidden" id="share-item-id" name="item_id">
+
+                    <div class="form-group">
+                        <label for="expire-hours">Expiration Time (Hours):</label>
+                        <input type="number" id="expire-hours" name="expire_hours" value="24" min="1" max="720" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="max-uses">Maximum Uses Allowed:</label>
+                        <input type="number" id="max-uses" name="max_uses" value="1" min="1" max="100" required>
+                    </div>
+
+                    <button type="submit" class="btn-primary">Generate Token & Share Link</button>
+                </form>
+
+                <div id="share-result" class="share-result-box hidden">
+                    <!-- Share URL output populated dynamically by app.js -->
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
