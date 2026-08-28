@@ -165,7 +165,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>${(file.file_size / 1024).toFixed(1)} KB</td>
                 <td>${file.created_at}</td>
                 <td>
-                    <a href="api.php?action=download_file&id=${file.id}" class="btn-primary" style="padding: 4px 8px; text-decoration: none;">Download</a>
+                    <a href="api.php?action=download_file&id=${file.id}" target="_blank" class="btn-primary" style="padding: 4px 8px; text-decoration: none;">Download</a>
                     <a href="share.html?type=file&id=${file.id}" class="btn-secondary" style="padding: 4px 8px; text-decoration: none;">Share</a>
                     <button class="btn-delete-file btn-danger" data-id="${file.id}">Delete</button>
                 </td>

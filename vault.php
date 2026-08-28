@@ -65,7 +65,44 @@ class Vault {
             ]
         ];
     }
+    /**
+     * حذف یک فایل بر اساس id و بررسی مالکیت
+     */
+    public function deleteFile(int $userId, int $fileId): array {
+        $stmt = $this->db->prepare("SELECT encrypted_name FROM files WHERE id = ? AND user_id = ?");
+        $stmt->execute([$fileId, $userId]);
+        $file = $stmt->fetch();
 
+        if (!$file) {
+            return ['success' => false, 'message' => 'فایل یافت نشد یا دسترسی ندارید.'];
+        }
+
+        $filePath = STORAGE_DIR . $file['encrypted_name'];
+        if (file_exists($filePath)) {
+            @unlink($filePath);
+        }
+
+        $deleteStmt = $this->db->prepare("DELETE FROM files WHERE id = ? AND user_id = ?");
+        $deleteStmt->execute([$fileId, $userId]);
+
+        $this->logAction($userId, 'DELETE_FILE');
+        return ['success' => true, 'message' => 'فایل با موفقیت حذف شد.'];
+    }
+
+    /**
+     * حذف یک یادداشت بر اساس id و بررسی مالکیت
+     */
+    public function deleteNote(int $userId, int $noteId): array {
+        $stmt = $this->db->prepare("DELETE FROM notes WHERE id = ? AND user_id = ?");
+        $stmt->execute([$noteId, $userId]);
+
+        if ($stmt->rowCount() === 0) {
+            return ['success' => false, 'message' => 'یادداشت یافت نشد یا دسترسی ندارید.'];
+        }
+
+        $this->logAction($userId, 'DELETE_NOTE');
+        return ['success' => true, 'message' => 'یادداشت با موفقیت حذف شد.'];
+    }
     /**
      * لیست تمامی یادداشت‌های کاربر
      */

@@ -1,6 +1,8 @@
 <?php
-// ۱. تنظیم هدرهای پاسخ و امنیت
-header('Content-Type: application/json; charset=utf-8');
+// ۱. تنظیم هدرهای پاسخ و امنیت (در صورت دانلود، هدر JSON ارسال نمی‌شود)
+if (($_REQUEST['action'] ?? '') !== 'download_file') {
+    header('Content-Type: application/json; charset=utf-8');
+}
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
 
@@ -71,7 +73,6 @@ if ($action === 'register') {
 
     $result = $auth->register($username, $email, $password);
     if ($result['success']) {
-        // دریافت کلید secret از نام‌های مختلف احتمالی در آرایه خروجی
         $secret = $result['secret'] ?? $result['totp_secret'] ?? $result['data']['secret'] ?? null;
         $qrCode = $result['qr_code_url'] ?? $result['qr_code'] ?? null;
 
@@ -87,7 +88,6 @@ if ($action === 'register') {
 // ==========================================
 // ۴. بررسی احراز هویت برای سایر مسیرها
 // ==========================================
-// پشتیبانی از هر دو متد isLoggedIn و check جهت جلوگیری از خطای Fatal Error
 $isLoggedIn = method_exists($auth, 'isLoggedIn') ? $auth->isLoggedIn() : (method_exists($auth, 'check') ? $auth->check() : isset($_SESSION['user_id']));
 
 if (!$isLoggedIn) {
@@ -148,6 +148,23 @@ try {
             sendJsonResponse(true, 'لیست فایل‌ها دریافت شد.', ['files' => $files]);
             break;
 
+        case 'get_note':
+            $noteId = (int)($_GET['note_id'] ?? 0);
+            // تغییر نام متد از getNoteContent به getNote
+            $res = $vault->getNote($userId, $noteId);
+            sendJsonResponse($res['success'], $res['message'] ?? 'موفق', $res['success'] ? ['note' => $res['note']] : [], $res['success'] ? 200 : 404);
+            break;
+
+        case 'download_file':
+            $fileId = (int)($_GET['id'] ?? 0);
+            if ($fileId <= 0) {
+                sendJsonResponse(false, 'شناسه فایل نامعتبر است.', [], 400);
+            }
+
+            // فراخوانی مستقیم متد دانلود (چون خودش هدرها را تنظیم و فایل را استریم می‌کند)
+            $vault->downloadFile($userId, $fileId);
+            exit;
+
         case 'delete_file':
             $fileId = (int)($_POST['file_id'] ?? 0);
             $res = $vault->deleteFile($userId, $fileId);
@@ -165,12 +182,6 @@ try {
         case 'list_notes':
             $notes = $vault->getUserNotes($userId);
             sendJsonResponse(true, 'لیست یادداشت‌ها دریافت شد.', ['notes' => $notes]);
-            break;
-
-        case 'get_note':
-            $noteId = (int)($_GET['note_id'] ?? 0);
-            $res = $vault->getNoteContent($userId, $noteId);
-            sendJsonResponse($res['success'], $res['message'], $res['success'] ? ['note' => $res['note']] : [], $res['success'] ? 200 : 404);
             break;
 
         case 'delete_note':
