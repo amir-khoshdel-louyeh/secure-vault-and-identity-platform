@@ -20,5 +20,7 @@ Thumbs.db
 *.log
 
 
-proposal.txt
+# The storage folder and content
 uploads/
+
+proposal.txt
