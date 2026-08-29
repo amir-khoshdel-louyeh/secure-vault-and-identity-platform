@@ -42,8 +42,8 @@ class ShareManager {
         $this->logAction($userId, 'CREATE_SHARE_TOKEN');
 
         return [
-            'success' => true,
-            'token'   => $token,
+            'success'    => true,
+            'token'      => $token,
             'expires_at' => $expiresAt,
             'max_uses'   => $maxUses
         ];
@@ -75,7 +75,7 @@ class ShareManager {
             die("این لینک یک‌بارمصرف بوده و قبلاً استفاده شده است.");
         }
 
-        // ۴. افزایش تعداد دفعات استفاده
+        // ۴. افزایش تعداد دفعات استفاده پیش از استریم (برای جلوگیری از Race Condition)
         $updateStmt = $this->db->prepare("UPDATE share_tokens SET uses_count = uses_count + 1 WHERE id = ?");
         $updateStmt->execute([$share['id']]);
 
@@ -108,7 +108,7 @@ class ShareManager {
         header('Content-Length: ' . $file['file_size']);
         header('X-Content-Type-Options: nosniff');
 
-        Crypto::decryptFileToStream($filePath, $file['iv']);
+        Crypto::decryptFileToStream($filePath, $file['iv'], $file['tag'] ?? '');
         exit;
     }
 
@@ -122,7 +122,7 @@ class ShareManager {
             die("یادداشت یافت نشد.");
         }
 
-        $plainText = Crypto::decryptText($note['encrypted_content'], $note['iv']);
+        $plainText = Crypto::decryptText($note['encrypted_content'], $note['iv'], $note['tag'] ?? '');
 
         header('Content-Type: text/html; charset=utf-8');
         echo "<!DOCTYPE html><html lang='fa' dir='rtl'><head><meta charset='UTF-8'><title>" . htmlspecialchars($note['title'], ENT_QUOTES, 'UTF-8') . "</title></head><body style='font-family:sans-serif; padding:2rem;'>";
