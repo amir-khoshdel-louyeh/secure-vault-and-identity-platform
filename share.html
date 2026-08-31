@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="">
     <title>Secure Share Link - Secure Vault Platform</title>
     <link rel="stylesheet" href="style.css">
 </head>
@@ -13,13 +14,15 @@
         <header>
             <h1>Secure Vault & Identity Platform</h1>
             <div id="user-bar">
-                <a href="dashboard.html" class="btn-secondary">Back to Dashboard</a>
+                <a href="dashboard.html" class="btn-secondary" id="dashboard-link">Back to Dashboard</a>
             </div>
         </header>
 
-        <!-- Share Section / Card Container -->
-        <section id="share-section">
-            <div class="card">
+        <!-- Main Share Section Container -->
+        <main id="share-section">
+
+            <!-- MODE 1: CREATE SHARE LINK FORM (Used when owner creates a link) -->
+            <div id="create-share-card" class="card">
                 <h3>Create Secure Share Link</h3>
                 
                 <form id="share-form">
@@ -27,8 +30,13 @@
                     <input type="hidden" id="share-item-id" name="item_id">
 
                     <div class="form-group">
-                        <label for="expire-hours">Expiration Time (Hours):</label>
-                        <input type="number" id="expire-hours" name="expire_hours" value="24" min="1" max="720" required>
+                        <label for="expire-hours">Expiration Time:</label>
+                        <select id="expire-hours" name="expire_hours">
+                            <option value="1">1 Hour</option>
+                            <option value="12">12 Hours</option>
+                            <option value="24" selected>24 Hours</option>
+                            <option value="168">7 Days</option>
+                        </select>
                     </div>
 
                     <div class="form-group">
@@ -36,14 +44,63 @@
                         <input type="number" id="max-uses" name="max_uses" value="1" min="1" max="100" required>
                     </div>
 
-                    <button type="submit" class="btn-primary">Generate Token & Share Link</button>
+                    <button type="submit" class="btn-primary">Generate Share Link</button>
                 </form>
 
-                <div id="share-result" class="share-result-box hidden">
-                    <!-- Share URL output populated dynamically by app.js -->
+                <div id="share-result" class="share-result-box" style="display: none;">
+                    <p>Generated Secure Public Link:</p>
+                    <div class="inline-form">
+                        <input type="text" id="share-url-input" readonly>
+                        <button type="button" id="copy-share-btn" class="btn-primary">Copy Link</button>
+                    </div>
                 </div>
             </div>
-        </section>
+
+            <!-- MODE 2: PUBLIC ACCESS & VIEW CARD (Used when someone opens a ?token= link) -->
+            <div id="view-share-card" class="card" style="display: none;">
+                <h3>Shared Secure Item</h3>
+                <div id="share-loading-spinner">Loading shared content...</div>
+
+                <div id="share-content-area" style="display: none;">
+                    <div class="item-metadata">
+                        <p><strong>Item Type:</strong> <span id="shared-type-label"></span></p>
+                        <p><strong>Remaining Uses:</strong> <span id="shared-uses-label"></span></p>
+                        <p><strong>Expires At:</strong> <span id="shared-expires-label"></span></p>
+                    </div>
+
+                    <hr>
+
+                    <!-- File Download Action Area -->
+                    <div id="shared-file-actions" style="display: none;">
+                        <p><strong>File Name:</strong> <span id="shared-file-name"></span></p>
+                        <p><strong>File Size:</strong> <span id="shared-file-size"></span></p>
+                        <button id="download-shared-file-btn" class="btn-primary">Download File (AES-256-GCM)</button>
+                    </div>
+
+                    <!-- Note View Action Area -->
+                    <div id="shared-note-actions" style="display: none;">
+                        <h4 id="shared-note-title"></h4>
+                        
+                        <!-- Client-side decryption prompt if note is zero-knowledge encrypted -->
+                        <div id="zk-decryption-prompt" class="form-group" style="display: none;">
+                            <label for="zk-decryption-key">Enter Passphrase/Key to Decrypt Note:</label>
+                            <input type="password" id="zk-decryption-key" placeholder="Decryption key...">
+                            <button id="decrypt-note-btn" class="btn-primary">Decrypt Note</button>
+                        </div>
+
+                        <div id="shared-note-content-wrapper">
+                            <pre id="shared-note-content" class="note-box"></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Error message box for expired/invalid tokens -->
+                <div id="share-error-box" class="alert-danger" style="display: none;">
+                    <p id="share-error-message">This share link is invalid, expired, or has reached its maximum download limit.</p>
+                </div>
+            </div>
+
+        </main>
     </div>
 
     <script src="app.js"></script>
