@@ -8,6 +8,9 @@
     --secondary-hover: #475569;
     --danger-color: #ef4444;
     --danger-hover: #dc2626;
+    --success-color: #10b981;
+    --success-hover: #059669;
+    --warning-color: #f59e0b;
     --bg-color: #f8fafc;
     --card-bg: #ffffff;
     --text-color: #0f172a;
@@ -39,6 +42,15 @@ body {
 /* Helper Utilities */
 .hidden {
     display: none !important;
+}
+
+code {
+    background-color: #f1f5f9;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: "Courier New", Courier, monospace;
+    font-size: 0.85rem;
+    color: var(--primary-color);
 }
 
 /* ==========================================
@@ -74,10 +86,42 @@ header h1 {
     color: var(--text-color);
 }
 
+/* Navigation Tabs */
+.tabs-nav {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 24px;
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 4px;
+}
+
+.nav-tab {
+    padding: 8px 16px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    background: transparent;
+    border: none;
+    border-radius: var(--radius) var(--radius) 0 0;
+    cursor: pointer;
+    transition: color 0.2s, background-color 0.2s;
+}
+
+.nav-tab:hover {
+    color: var(--primary-color);
+    background-color: #f1f5f9;
+}
+
+.nav-tab.active {
+    color: var(--primary-color);
+    border-bottom: 3px solid var(--primary-color);
+    background-color: #ffffff;
+}
+
 /* ==========================================
    3. Buttons & Controls
    ========================================== */
-button, .btn-primary, .btn-secondary, .btn-danger {
+button, .btn-primary, .btn-secondary, .btn-danger, .btn-success {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -121,6 +165,15 @@ button:active {
     background-color: var(--danger-hover);
 }
 
+.btn-success {
+    background-color: var(--success-color);
+    color: #ffffff;
+}
+
+.btn-success:hover {
+    background-color: var(--success-hover);
+}
+
 /* ==========================================
    4. Form Elements & Inputs
    ========================================== */
@@ -141,7 +194,8 @@ input[type="email"],
 input[type="password"],
 input[type="number"],
 input[type="file"],
-textarea {
+textarea,
+select {
     width: 100%;
     padding: 10px 12px;
     border: 1px solid var(--border-color);
@@ -153,9 +207,42 @@ textarea {
     transition: border-color 0.2s, box-shadow 0.2s;
 }
 
-input:focus, textarea:focus {
+input:focus, textarea:focus, select:focus {
     border-color: var(--primary-color);
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: normal !important;
+    cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: auto;
+}
+
+/* Alert Boxes */
+.alert {
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    font-size: 0.9rem;
+    margin-bottom: 16px;
+    display: none;
+}
+
+.alert-danger {
+    background-color: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #991b1b;
+}
+
+.alert-success {
+    background-color: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #166534;
 }
 
 /* ==========================================
@@ -181,6 +268,14 @@ input:focus, textarea:focus {
 .auth-divider {
     width: 1px;
     background-color: var(--border-color);
+}
+
+.recovery-codes-box {
+    margin-top: 16px;
+    padding: 16px;
+    background-color: #fffbe6;
+    border: 1px solid #ffe58f;
+    border-radius: var(--radius);
 }
 
 /* ==========================================
@@ -267,7 +362,48 @@ tr:hover {
 }
 
 /* ==========================================
-   7. Share Component Layout (share.html)
+   7. Modals (Share Modal)
+   ========================================== */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(15, 23, 42, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: var(--card-bg);
+    padding: 24px;
+    border-radius: var(--radius);
+    max-width: 500px;
+    width: 90%;
+    box-shadow: var(--shadow);
+    position: relative;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+/* ==========================================
+   8. Share Component Layout (share.html)
    ========================================== */
 #share-section {
     max-width: 600px;
@@ -288,8 +424,14 @@ tr:hover {
     margin-bottom: 8px;
 }
 
+.copy-wrapper {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
 /* ==========================================
-   8. Responsive Design adjustments
+   9. Responsive Design adjustments
    ========================================== */
 @media (max-width: 768px) {
     .auth-box {
@@ -311,5 +453,9 @@ tr:hover {
     .inline-form {
         flex-direction: column;
         align-items: stretch;
+    }
+
+    .tabs-nav {
+        flex-wrap: wrap;
     }
 }
