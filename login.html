@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="">
     <title>Authentication - Secure Vault Platform</title>
     <link rel="stylesheet" href="style.css">
 </head>
@@ -17,10 +18,16 @@
         <!-- Authentication Section -->
         <section id="auth-section">
             <div class="auth-box">
-                <!-- Login Form -->
+                
+                <!-- Login Container (Supports Two-Step Login & Recovery Codes) -->
                 <div class="auth-form">
                     <h3>Sign In</h3>
-                    <form id="login-form">
+                    
+                    <!-- Alert Message Area -->
+                    <div id="login-alert" class="alert-danger" style="display: none;"></div>
+
+                    <!-- STEP 1: Username & Password -->
+                    <form id="login-step1-form">
                         <div class="form-group">
                             <label for="login-username">Username:</label>
                             <input type="text" id="login-username" name="username" required autocomplete="username">
@@ -29,19 +36,52 @@
                             <label for="login-password">Password:</label>
                             <input type="password" id="login-password" name="password" required autocomplete="current-password">
                         </div>
+                        <button type="submit" class="btn-primary">Next</button>
+                    </form>
+
+                    <!-- STEP 2: TOTP Authentication (Hidden by default, shown if 2FA is enabled) -->
+                    <form id="login-step2-form" style="display: none;">
+                        <input type="hidden" id="login-temp-token" name="temp_token">
+                        
                         <div class="form-group">
-                            <label for="login-totp">Two-Factor Code (TOTP):</label>
-                            <input type="text" id="login-totp" name="totp_code" placeholder="6-digit auth code" maxlength="6" autocomplete="off">
+                            <label for="login-totp">Two-Factor Authenticator Code (TOTP):</label>
+                            <input type="text" id="login-totp" name="totp_code" placeholder="6-digit code" maxlength="6" pattern="\d{6}" autocomplete="one-time-code">
                         </div>
-                        <button type="submit" class="btn-primary">Sign In</button>
+                        
+                        <button type="submit" class="btn-primary">Verify & Sign In</button>
+                        
+                        <div class="form-sub-actions">
+                            <button type="button" id="toggle-recovery-btn" class="btn-link">Use Recovery Code instead</button>
+                        </div>
+                    </form>
+
+                    <!-- STEP 2 ALTERNATIVE: Account Recovery via Backup Code -->
+                    <form id="login-recovery-form" style="display: none;">
+                        <input type="hidden" id="recovery-temp-token" name="temp_token">
+                        
+                        <div class="form-group">
+                            <label for="recovery-code">Recovery / Backup Code:</label>
+                            <input type="text" id="recovery-code" name="recovery_code" placeholder="Enter your backup code" autocomplete="off" required>
+                        </div>
+                        
+                        <button type="submit" class="btn-warning">Recover Account & Sign In</button>
+                        
+                        <div class="form-sub-actions">
+                            <button type="button" id="back-to-totp-btn" class="btn-link">Back to 2FA Code</button>
+                        </div>
                     </form>
                 </div>
 
                 <div class="auth-divider"></div>
 
-                <!-- Registration Form -->
+                <!-- Registration Container -->
                 <div class="auth-form">
                     <h3>Create Account</h3>
+                    
+                    <!-- Alert Message Area -->
+                    <div id="register-alert" class="alert-danger" style="display: none;"></div>
+                    <div id="register-success" class="alert-success" style="display: none;"></div>
+
                     <form id="register-form">
                         <div class="form-group">
                             <label for="reg-username">Username:</label>
@@ -53,11 +93,20 @@
                         </div>
                         <div class="form-group">
                             <label for="reg-password">Password:</label>
-                            <input type="password" id="reg-password" name="password" required autocomplete="new-password">
+                            <input type="password" id="reg-password" name="password" minlength="8" required autocomplete="new-password">
                         </div>
                         <button type="submit" class="btn-secondary">Register</button>
                     </form>
+
+                    <!-- Display Recovery Codes Upon Successful Registration / 2FA Setup -->
+                    <div id="recovery-codes-display" class="card" style="display: none;">
+                        <h4>Save Your Recovery Codes</h4>
+                        <p class="text-sm">Store these backup codes in a safe place. If you lose your 2FA device, you can use these to recover access:</p>
+                        <div id="codes-list-container" class="code-box"></div>
+                        <button type="button" id="confirm-saved-codes-btn" class="btn-primary">I Have Saved These Codes</button>
+                    </div>
                 </div>
+
             </div>
         </section>
     </div>
