@@ -1,23 +1,111 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // CSRF Token Storage
-    let csrfToken = '';
+    // CSRF Token Storage & State
+    let csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    let currentTempToken = ''; // Used for 2FA login step 2
 
     // Route / Page Detection
     const currentPath = window.location.pathname.split('/').pop();
     const currentPage = currentPath === '' ? 'index.html' : currentPath;
 
-    // UI Elements
-    const loginForm = document.getElementById('login-form');
+    // UI Elements - Forms & Nav
+    const loginStep1Form = document.getElementById('login-step1-form');
+    const loginStep2Form = document.getElementById('login-step2-form');
+    const loginRecoveryForm = document.getElementById('login-recovery-form');
     const registerForm = document.getElementById('register-form');
     const logoutBtn = document.getElementById('logout-btn');
     const uploadFileForm = document.getElementById('upload-file-form');
     const createNoteForm = document.getElementById('create-note-form');
     const shareForm = document.getElementById('share-form');
+    const enable2faForm = document.getElementById('enable-2fa-form');
+
+    // UI Elements - Displays & Lists
     const filesList = document.getElementById('files-list');
     const notesList = document.getElementById('notes-list');
+    const sessionsList = document.getElementById('sessions-list');
+    const trashList = document.getElementById('trash-list');
 
     // ==========================================
-    // 1. Unified API Request Handler
+    // 1. Web Crypto API Helpers (Zero-Knowledge AES-256-GCM)
+    // ==========================================
+    async function deriveKeyFromPassphrase(passphrase, saltHex = 'secure-vault-salt') {
+        const enc = new TextEncoder();
+        const keyMaterial = await window.crypto.subtle.importKey(
+            'raw', enc.encode(passphrase), { name: 'PBKDF2' }, false, ['deriveKey']
+        );
+        return window.crypto.subtle.deriveKey(
+            {
+                name: 'PBKDF2',
+                salt: enc.encode(saltHex),
+                iterations: 100000,
+                hash: 'SHA-256'
+            },
+            keyMaterial,
+            { name: 'AES-GCM', length: 256 },
+            false,
+            ['encrypt', 'decrypt']
+        );
+    }
+
+    async function clientEncryptText(text, passphrase) {
+        const enc = new TextEncoder();
+        const key = await deriveKeyFromPassphrase(passphrase);
+        const iv = window.crypto.getRandomValues(new Uint8Array(12));
+        
+        const encryptedBuffer = await window.crypto.subtle.encrypt(
+            { name: 'AES-GCM', iv: iv },
+            key,
+            enc.encode(text)
+        );
+
+        const encryptedBytes = new Uint8Array(encryptedBuffer);
+        const ciphertextBytes = encryptedBytes.slice(0, encryptedBytes.length - 16);
+        const tagBytes = encryptedBytes.slice(encryptedBytes.length - 16);
+
+        return {
+            ciphertext: bytesToBase64(ciphertextBytes),
+            iv: bytesToBase64(iv),
+            tag: bytesToBase64(tagBytes)
+        };
+    }
+
+    async function clientDecryptText(ciphertextBase64, ivBase64, tagBase64, passphrase) {
+        const key = await deriveKeyFromPassphrase(passphrase);
+        const ciphertextBytes = base64ToBytes(ciphertextBase64);
+        const tagBytes = base64ToBytes(tagBase64);
+        const ivBytes = base64ToBytes(ivBase64);
+
+        const combinedBytes = new Uint8Array(ciphertextBytes.length + tagBytes.length);
+        combinedBytes.set(ciphertextBytes, 0);
+        combinedBytes.set(tagBytes, ciphertextBytes.length);
+
+        const decryptedBuffer = await window.crypto.subtle.decrypt(
+            { name: 'AES-GCM', iv: ivBytes },
+            key,
+            combinedBytes
+        );
+
+        return new TextDecoder().decode(decryptedBuffer);
+    }
+
+    function bytesToBase64(bytes) {
+        let binary = '';
+        for (let i = 0; i < bytes.byteLength; i++) {
+            binary += String.fromCharCode(bytes[i]);
+        }
+        return window.btoa(binary);
+    }
+
+    function base64ToBytes(base64) {
+        const binaryString = window.atob(base64);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+        }
+        return bytes;
+    }
+
+    // ==========================================
+    // 2. Unified API Request Handler
     // ==========================================
     async function apiRequest(action, method = 'GET', data = null) {
         let url = `api.php?action=${encodeURIComponent(action)}`;
@@ -26,13 +114,17 @@ document.addEventListener('DOMContentLoaded', () => {
             headers: {}
         };
 
+        if (csrfToken) {
+            options.headers['X-CSRF-TOKEN'] = csrfToken;
+        }
+
         if (method === 'POST') {
             if (data instanceof FormData) {
-                if (csrfToken) data.append('csrf_token', csrfToken);
+                if (csrfToken && !data.has('csrf_token')) data.append('csrf_token', csrfToken);
                 options.body = data;
             } else {
                 const params = new URLSearchParams(data || {});
-                if (csrfToken) params.append('csrf_token', csrfToken);
+                if (csrfToken && !params.has('csrf_token')) params.append('csrf_token', csrfToken);
                 options.headers['Content-Type'] = 'application/x-www-form-urlencoded';
                 options.body = params;
             }
@@ -45,13 +137,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(url, options);
             const result = await response.json();
 
-            // Update CSRF token dynamically if server returns a new one
             if (result && result.csrf_token) {
                 csrfToken = result.csrf_token;
             }
 
-            // Redirect unauthenticated users to login if 401 occurs
-            if (response.status === 401 && action !== 'login') {
+            if (response.status === 401 && action !== 'login_step1' && action !== 'login_step2' && action !== 'recover_account') {
                 redirectToLogin();
                 return null;
             }
@@ -59,39 +149,59 @@ document.addEventListener('DOMContentLoaded', () => {
             return result;
         } catch (error) {
             console.error('API Request Error:', error);
-            alert('Server communication error.');
-            return null;
+            return { success: false, message: 'Server communication error.' };
         }
     }
 
-    // Navigation & Auth Guard
     function redirectToLogin() {
-        if (currentPage !== 'login.html' && currentPage !== 'index.html') {
+        if (currentPage !== 'login.html' && currentPage !== 'index.html' && currentPage !== 'share.html') {
             window.location.href = 'login.html';
         }
     }
 
     // ==========================================
-    // 2. Authentication Check & Initializer
+    // 3. Navigation Tabs (Dashboard)
+    // ==========================================
+    const navTabs = document.querySelectorAll('.nav-tab');
+    navTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            navTabs.forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+
+            tab.classList.add('active');
+            const target = tab.dataset.tab;
+            const targetElem = document.getElementById(target);
+            if (targetElem) targetElem.style.display = 'block';
+
+            if (target === 'sessions-tab') loadSessions();
+            if (target === 'security-tab') check2FAStatus();
+            if (target === 'trash-tab') loadTrash();
+        });
+    });
+
+    // ==========================================
+    // 4. Auth & Initializer
     // ==========================================
     async function checkAuthStatus() {
+        if (currentPage === 'share.html' && new URLSearchParams(window.location.search).has('token')) {
+            initPublicShareView();
+            return;
+        }
+
         const res = await apiRequest('get_user_info');
         
         if (res && res.success) {
-            csrfToken = res.csrf_token || '';
+            csrfToken = res.csrf_token || csrfToken;
 
-            // Update user welcome UI if element exists
             const welcomeUserElem = document.getElementById('welcome-user');
             if (welcomeUserElem) {
-                welcomeUserElem.innerText = `Welcome, ${res.username || res.user?.username}`;
+                welcomeUserElem.innerText = `Welcome, ${res.user?.username || res.username}`;
             }
 
-            // Redirect away from login if already authenticated
             if (currentPage === 'login.html' || currentPage === 'index.html') {
                 window.location.href = 'dashboard.html';
             }
 
-            // Load data specific to pages
             if (currentPage === 'dashboard.html') {
                 loadFiles();
                 loadNotes();
@@ -104,18 +214,83 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ==========================================
-    // 3. Login, Registration & Logout Handlers
+    // 5. Authentication Handlers (Two-Step & Recovery)
     // ==========================================
-    if (loginForm) {
-        loginForm.addEventListener('submit', async (e) => {
+    if (loginStep1Form) {
+        loginStep1Form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const formData = new FormData(loginForm);
-            const res = await apiRequest('login', 'POST', formData);
+            const alertBox = document.getElementById('login-alert');
+            alertBox.style.display = 'none';
+
+            const formData = new FormData(loginStep1Form);
+            const res = await apiRequest('login_step1', 'POST', formData);
+
+            if (res && res.success) {
+                if (res.requires_2fa) {
+                    currentTempToken = res.temp_token;
+                    document.getElementById('login-temp-token').value = res.temp_token;
+                    document.getElementById('recovery-temp-token').value = res.temp_token;
+                    loginStep1Form.style.display = 'none';
+                    loginStep2Form.style.display = 'block';
+                } else {
+                    window.location.href = 'dashboard.html';
+                }
+            } else {
+                alertBox.innerText = res?.message || 'Login failed.';
+                alertBox.style.display = 'block';
+            }
+        });
+    }
+
+    if (loginStep2Form) {
+        loginStep2Form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const alertBox = document.getElementById('login-alert');
+            alertBox.style.display = 'none';
+
+            const formData = new FormData(loginStep2Form);
+            const res = await apiRequest('login_step2', 'POST', formData);
 
             if (res && res.success) {
                 window.location.href = 'dashboard.html';
-            } else if (res) {
-                alert(res.message || 'Login failed.');
+            } else {
+                alertBox.innerText = res?.message || 'Invalid 2FA code.';
+                alertBox.style.display = 'block';
+            }
+        });
+    }
+
+    // Recovery code toggles
+    const toggleRecoveryBtn = document.getElementById('toggle-recovery-btn');
+    const backToTotpBtn = document.getElementById('back-to-totp-btn');
+    if (toggleRecoveryBtn) {
+        toggleRecoveryBtn.addEventListener('click', () => {
+            loginStep2Form.style.display = 'none';
+            loginRecoveryForm.style.display = 'block';
+        });
+    }
+    if (backToTotpBtn) {
+        backToTotpBtn.addEventListener('click', () => {
+            loginRecoveryForm.style.display = 'none';
+            loginStep2Form.style.display = 'block';
+        });
+    }
+
+    if (loginRecoveryForm) {
+        loginRecoveryForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const alertBox = document.getElementById('login-alert');
+            alertBox.style.display = 'none';
+
+            const formData = new FormData(loginRecoveryForm);
+            const res = await apiRequest('recover_account', 'POST', formData);
+
+            if (res && res.success) {
+                alert('Account recovered successfully!');
+                window.location.href = 'dashboard.html';
+            } else {
+                alertBox.innerText = res?.message || 'Invalid recovery code.';
+                alertBox.style.display = 'block';
             }
         });
     }
@@ -123,22 +298,37 @@ document.addEventListener('DOMContentLoaded', () => {
     if (registerForm) {
         registerForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            const alertBox = document.getElementById('register-alert');
+            const successBox = document.getElementById('register-success');
+            alertBox.style.display = 'none';
+            successBox.style.display = 'none';
+
             const formData = new FormData(registerForm);
             const res = await apiRequest('register', 'POST', formData);
 
             if (res && res.success) {
-                if (res.secret) {
-                    prompt(
-                        'Registration successful!\n\nIMPORTANT: Copy your 2FA TOTP secret key and enter it into Google Authenticator:',
-                        res.secret
-                    );
-                } else {
-                    alert(res.message + ' (Warning: TOTP Secret was not generated)');
-                }
                 registerForm.reset();
-            } else if (res) {
-                alert(res.message || 'Registration failed.');
+                if (res.recovery_codes && res.recovery_codes.length > 0) {
+                    const displayBox = document.getElementById('recovery-codes-display');
+                    const listContainer = document.getElementById('codes-list-container');
+                    listContainer.innerHTML = res.recovery_codes.map(c => `<code>${c}</code>`).join('<br>');
+                    displayBox.style.display = 'block';
+                } else {
+                    successBox.innerText = 'Registration successful! You can now sign in.';
+                    successBox.style.display = 'block';
+                }
+            } else {
+                alertBox.innerText = res?.message || 'Registration failed.';
+                alertBox.style.display = 'block';
             }
+        });
+    }
+
+    const confirmSavedCodesBtn = document.getElementById('confirm-saved-codes-btn');
+    if (confirmSavedCodesBtn) {
+        confirmSavedCodesBtn.addEventListener('click', () => {
+            document.getElementById('recovery-codes-display').style.display = 'none';
+            alert('Please sign in using your username and password.');
         });
     }
 
@@ -150,7 +340,74 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ==========================================
-    // 4. File Management (Dashboard)
+    // 6. 2FA Setup
+    // ==========================================
+    async function check2FAStatus() {
+        const res = await apiRequest('2fa_status');
+        const statusText = document.getElementById('2fa-status-text');
+        if (statusText && res && res.success) {
+            statusText.innerText = res.enabled ? 'Enabled' : 'Disabled';
+        }
+    }
+
+    const setup2faBtn = document.getElementById('setup-2fa-btn');
+    if (setup2faBtn) {
+        setup2faBtn.addEventListener('click', async () => {
+            const res = await apiRequest('setup_2fa', 'POST');
+            if (res && res.success) {
+                document.getElementById('2fa-secret-key').innerText = res.secret;
+                const qrWrapper = document.getElementById('qr-code-wrapper');
+                if (res.qr_code_url) {
+                    qrWrapper.innerHTML = `<img src="${res.qr_code_url}" alt="2FA QR Code">`;
+                } else {
+                    qrWrapper.innerText = 'Scan URI: ' + res.otpauth_url;
+                }
+                document.getElementById('2fa-setup-box').style.display = 'block';
+            }
+        });
+    }
+
+    if (enable2faForm) {
+        enable2faForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(enable2faForm);
+            const res = await apiRequest('enable_2fa', 'POST', formData);
+
+            if (res && res.success) {
+                alert('2FA successfully enabled!');
+                document.getElementById('2fa-setup-box').style.display = 'none';
+                check2FAStatus();
+            } else {
+                alert(res?.message || 'Invalid code.');
+            }
+        });
+    }
+
+    // ==========================================
+    // 7. Active Sessions Management
+    // ==========================================
+    async function loadSessions() {
+        if (!sessionsList) return;
+        const res = await apiRequest('get_sessions');
+        if (!res || !res.success) return;
+
+        sessionsList.innerHTML = '';
+        res.sessions.forEach(session => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${escapeHtml(session.ip_address)}</td>
+                <td>${escapeHtml(session.user_agent.substring(0, 40))}...</td>
+                <td>${session.last_activity}</td>
+                <td>
+                    <button class="btn-revoke-session btn-danger" data-id="${session.id}">Revoke</button>
+                </td>
+            `;
+            sessionsList.appendChild(tr);
+        });
+    }
+
+    // ==========================================
+    // 8. Files Management
     // ==========================================
     async function loadFiles() {
         if (!filesList) return;
@@ -166,8 +423,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>${file.created_at}</td>
                 <td>
                     <a href="api.php?action=download_file&id=${file.id}" target="_blank" class="btn-primary" style="padding: 4px 8px; text-decoration: none;">Download</a>
-                    <a href="share.html?type=file&id=${file.id}" class="btn-secondary" style="padding: 4px 8px; text-decoration: none;">Share</a>
-                    <button class="btn-delete-file btn-danger" data-id="${file.id}">Delete</button>
+                    <button class="btn-share-item btn-secondary" data-type="file" data-id="${file.id}">Share</button>
+                    <button class="btn-delete-file btn-danger" data-id="${file.id}">Trash</button>
                 </td>
             `;
             filesList.appendChild(tr);
@@ -183,14 +440,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (res && res.success) {
                 uploadFileForm.reset();
                 loadFiles();
-            } else if (res) {
-                alert(res.message || 'File upload failed.');
+            } else {
+                alert(res?.message || 'File upload failed.');
             }
         });
     }
 
     // ==========================================
-    // 5. Secure Notes Management (Dashboard)
+    // 9. Notes Management (Zero-Knowledge & Server AES-GCM)
     // ==========================================
     async function loadNotes() {
         if (!notesList) return;
@@ -206,9 +463,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 <h4>${escapeHtml(note.title)}</h4>
                 <small>${note.created_at}</small>
                 <div class="actions" style="margin-top: 10px;">
-                    <button class="btn-view-note btn-primary" data-id="${note.id}">View Content</button>
-                    <a href="share.html?type=note&id=${note.id}" class="btn-secondary" style="padding: 4px 8px; text-decoration: none;">Share</a>
-                    <button class="btn-delete-note btn-danger" data-id="${note.id}">Delete</button>
+                    <button class="btn-view-note btn-primary" data-id="${note.id}">View Note</button>
+                    <button class="btn-share-item btn-secondary" data-type="note" data-id="${note.id}">Share</button>
+                    <button class="btn-delete-note btn-danger" data-id="${note.id}">Trash</button>
                 </div>
             `;
             notesList.appendChild(card);
@@ -218,53 +475,242 @@ document.addEventListener('DOMContentLoaded', () => {
     if (createNoteForm) {
         createNoteForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const formData = new FormData(createNoteForm);
-            const res = await apiRequest('create_note', 'POST', formData);
+            const title = createNoteForm.title.value;
+            const content = createNoteForm.content.value;
+            const tags = createNoteForm.tags ? createNoteForm.tags.value : '';
+            const isClientEncrypt = document.getElementById('enable-client-crypto')?.checked;
+
+            let postData = { title, content, tags };
+
+            if (isClientEncrypt) {
+                const passphrase = prompt('Enter a Client-Side Passphrase to encrypt this note (Zero-Knowledge):');
+                if (!passphrase) return;
+
+                const encrypted = await clientEncryptText(content, passphrase);
+                postData.content = encrypted.ciphertext;
+                postData.is_client_encrypted = '1';
+                postData.custom_iv = encrypted.iv;
+                postData.custom_tag = encrypted.tag;
+            }
+
+            const res = await apiRequest('create_note', 'POST', postData);
 
             if (res && res.success) {
                 createNoteForm.reset();
                 loadNotes();
-            } else if (res) {
-                alert(res.message || 'Failed to save note.');
+            } else {
+                alert(res?.message || 'Failed to save note.');
             }
         });
     }
 
     // ==========================================
-    // 6. Global Event Delegation (Delete & View)
+    // 10. Trash Management
+    // ==========================================
+    async function loadTrash() {
+        if (!trashList) return;
+        const res = await apiRequest('list_trash');
+        if (!res || !res.success) return;
+
+        trashList.innerHTML = '';
+        res.trash.forEach(item => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${escapeHtml(item.type)}</td>
+                <td>${escapeHtml(item.name)}</td>
+                <td>${item.deleted_at}</td>
+                <td>
+                    <button class="btn-restore-item btn-primary" data-type="${item.type}" data-id="${item.id}">Restore</button>
+                </td>
+            `;
+            trashList.appendChild(tr);
+        });
+    }
+
+    // ==========================================
+    // 11. Global Delegated Click Actions
     // ==========================================
     document.addEventListener('click', async (e) => {
-        // Delete File
+        // Trash File
         if (e.target.classList.contains('btn-delete-file')) {
-            if (confirm('Are you sure you want to delete this file?')) {
+            if (confirm('Move this file to Trash?')) {
                 const res = await apiRequest('delete_file', 'POST', { file_id: e.target.dataset.id });
                 if (res && res.success) loadFiles();
             }
         }
 
-        // Delete Note
+        // Trash Note
         if (e.target.classList.contains('btn-delete-note')) {
-            if (confirm('Are you sure you want to delete this note?')) {
+            if (confirm('Move this note to Trash?')) {
                 const res = await apiRequest('delete_note', 'POST', { note_id: e.target.dataset.id });
                 if (res && res.success) loadNotes();
             }
         }
 
-        // View Decrypted Note
+        // Restore Trash Item
+        if (e.target.classList.contains('btn-restore-item')) {
+            const res = await apiRequest('restore_trash', 'POST', {
+                type: e.target.dataset.type,
+                item_id: e.target.dataset.id
+            });
+            if (res && res.success) loadTrash();
+        }
+
+        // Revoke Session
+        if (e.target.classList.contains('btn-revoke-session')) {
+            if (confirm('Revoke this active session?')) {
+                const res = await apiRequest('revoke_session', 'POST', { session_id: e.target.dataset.id });
+                if (res && res.success) loadSessions();
+            }
+        }
+
+        // View Note
         if (e.target.classList.contains('btn-view-note')) {
             const noteId = e.target.dataset.id;
             const res = await apiRequest('get_note', 'GET', { note_id: noteId });
+
             if (res && res.success) {
-                alert(`Title: ${res.note.title}\n\nContent:\n${res.note.content}`);
-            } else if (res) {
-                alert(res.message || 'Unable to retrieve note.');
+                const note = res.note;
+                let displayContent = note.content;
+
+                // Check if zero-knowledge encrypted (iv is empty or client flag set)
+                if (!note.iv || note.iv === '') {
+                    const passphrase = prompt('This note is Zero-Knowledge Encrypted. Enter decryption passphrase:');
+                    if (passphrase) {
+                        try {
+                            displayContent = await clientDecryptText(note.encrypted_content, note.iv, note.tag, passphrase);
+                        } catch (err) {
+                            alert('Decryption failed! Incorrect passphrase.');
+                            return;
+                        }
+                    } else {
+                        return;
+                    }
+                }
+
+                alert(`Title: ${note.title}\n\nContent:\n${displayContent}`);
+            } else {
+                alert(res?.message || 'Unable to retrieve note.');
+            }
+        }
+
+        // Open Share Modal
+        if (e.target.classList.contains('btn-share-item')) {
+            const type = e.target.dataset.type;
+            const id = e.target.dataset.id;
+            
+            const modal = document.getElementById('share-modal');
+            if (modal) {
+                document.getElementById('share-item-type').value = type;
+                document.getElementById('share-item-id').value = id;
+                document.getElementById('share-result-box').style.display = 'none';
+                modal.style.display = 'flex';
+            } else {
+                window.location.href = `share.html?type=${type}&id=${id}`;
             }
         }
     });
 
+    // Close Modal Button
+    const closeModalBtn = document.getElementById('close-modal-btn');
+    if (closeModalBtn) {
+        closeModalBtn.addEventListener('click', () => {
+            document.getElementById('share-modal').style.display = 'none';
+        });
+    }
+
+    // Modal / Page Share Form Submit
+    if (shareForm) {
+        shareForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(shareForm);
+            const res = await apiRequest('create_share_link', 'POST', formData);
+
+            if (res && res.success) {
+                const fullUrl = `${window.location.origin}/share.html?token=${res.token}`;
+                
+                const outputField = document.getElementById('share-url-output') || document.getElementById('share-url-input');
+                const resultDiv = document.getElementById('share-result-box') || document.getElementById('share-result');
+
+                if (outputField) outputField.value = fullUrl;
+                if (resultDiv) resultDiv.style.display = 'block';
+
+                const copyBtn = document.getElementById('copy-share-url-btn') || document.getElementById('copy-share-btn');
+                if (copyBtn) {
+                    copyBtn.onclick = () => {
+                        outputField.select();
+                        navigator.clipboard.writeText(fullUrl);
+                        alert('Share URL copied to clipboard!');
+                    };
+                }
+            } else {
+                alert(res?.message || 'Failed to generate share link.');
+            }
+        });
+    }
+
     // ==========================================
-    // 7. Secure Share Link Generator (share.html)
+    // 12. Public Share Access Handler (?token=...)
     // ==========================================
+    async function initPublicShareView() {
+        const createCard = document.getElementById('create-share-card');
+        const viewCard = document.getElementById('view-share-card');
+        const spinner = document.getElementById('share-loading-spinner');
+        const contentArea = document.getElementById('share-content-area');
+        const errorBox = document.getElementById('share-error-box');
+
+        if (createCard) createCard.style.display = 'none';
+        if (viewCard) viewCard.style.display = 'block';
+
+        const token = new URLSearchParams(window.location.search).get('token');
+        const res = await apiRequest('access_shared_item', 'GET', { token });
+
+        if (spinner) spinner.style.display = 'none';
+
+        if (res && res.success) {
+            contentArea.style.display = 'block';
+            document.getElementById('shared-type-label').innerText = res.type.toUpperCase();
+            document.getElementById('shared-uses-label').innerText = res.remaining_uses;
+            document.getElementById('shared-expires-label').innerText = res.expires_at;
+
+            if (res.type === 'file') {
+                const fileActions = document.getElementById('shared-file-actions');
+                fileActions.style.display = 'block';
+                document.getElementById('shared-file-name').innerText = res.file.original_name;
+                document.getElementById('shared-file-size').innerText = (res.file.file_size / 1024).toFixed(1) + ' KB';
+
+                document.getElementById('download-shared-file-btn').onclick = () => {
+                    window.location.href = `api.php?action=download_shared_file&token=${encodeURIComponent(token)}`;
+                };
+            } else if (res.type === 'note') {
+                const noteActions = document.getElementById('shared-note-actions');
+                noteActions.style.display = 'block';
+                document.getElementById('shared-note-title').innerText = res.note.title;
+
+                if (res.note.is_zk_encrypted) {
+                    document.getElementById('zk-decryption-prompt').style.display = 'block';
+                    document.getElementById('decrypt-note-btn').onclick = async () => {
+                        const passphrase = document.getElementById('zk-decryption-key').value;
+                        try {
+                            const decrypted = await clientDecryptText(res.note.content, res.note.iv, res.note.tag, passphrase);
+                            document.getElementById('shared-note-content').innerText = decrypted;
+                            document.getElementById('zk-decryption-prompt').style.display = 'none';
+                        } catch (err) {
+                            alert('Decryption failed! Invalid key.');
+                        }
+                    };
+                } else {
+                    document.getElementById('shared-note-content').innerText = res.note.content;
+                }
+            }
+        } else {
+            if (errorBox) {
+                document.getElementById('share-error-message').innerText = res?.message || 'Link invalid or expired.';
+                errorBox.style.display = 'block';
+            }
+        }
+    }
+
     function initSharePage() {
         const urlParams = new URLSearchParams(window.location.search);
         const itemType = urlParams.get('type');
@@ -279,39 +725,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    if (shareForm) {
-        shareForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const formData = new FormData(shareForm);
-            const res = await apiRequest('create_share_link', 'POST', formData);
-
-            if (res && res.success) {
-                const fullUrl = `${window.location.origin}/${res.share_url}`;
-                const resultDiv = document.getElementById('share-result');
-                resultDiv.innerHTML = `
-                    <p>Secure link generated successfully:</p>
-                    <input type="text" readonly value="${fullUrl}" id="share-url-input" style="width: 100%; margin: 8px 0; padding: 6px;">
-                    <button type="button" id="copy-share-url" class="btn-primary">Copy Link</button>
-                    <div style="margin-top: 8px;">
-                        <small>Expires at: ${res.expires_at} | Max uses: ${res.max_uses}</small>
-                    </div>
-                `;
-                resultDiv.classList.remove('hidden');
-
-                document.getElementById('copy-share-url').addEventListener('click', () => {
-                    const input = document.getElementById('share-url-input');
-                    input.select();
-                    navigator.clipboard.writeText(fullUrl);
-                    alert('Link copied to clipboard!');
-                });
-            } else if (res) {
-                alert(res.message || 'Failed to generate share link.');
-            }
-        });
-    }
-
     // Helper: Escape HTML to prevent XSS
     function escapeHtml(str) {
+        if (!str) return '';
         return String(str).replace(/[&<>"']/g, match => ({
             '&': '&amp;',
             '<': '&lt;',
@@ -321,6 +737,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }[match]));
     }
 
-    // Initialize Auth Check
+    // Start App
     checkAuthStatus();
 });
