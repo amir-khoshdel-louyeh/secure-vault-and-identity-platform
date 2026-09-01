@@ -99,8 +99,28 @@ if ($action === 'register') {
     if ($result['success']) {
         sendJsonResponse(true, $result['message'], [
             'secret'        => $result['secret'] ?? null,
+            'qr_code'       => $result['qr_code'] ?? null,
             'recovery_code' => $result['recovery_code'] ?? null
         ]);
+    } else {
+        sendJsonResponse(false, $result['message'], [], 400);
+    }
+}
+
+// تأیید 2FA پس از ثبت‌نام
+if ($action === 'confirm_reg_2fa') {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        sendJsonResponse(false, 'روش درخواست نامعتبر است.', [], 405);
+    }
+
+    $code = trim($_POST['code'] ?? $_POST['totp_code'] ?? '');
+    if (empty($code)) {
+        sendJsonResponse(false, 'لطفاً کد ۶ رقمی را وارد کنید.', [], 400);
+    }
+
+    $result = $auth->confirmRegistration2FA($code);
+    if ($result['success']) {
+        sendJsonResponse(true, $result['message']);
     } else {
         sendJsonResponse(false, $result['message'], [], 400);
     }
