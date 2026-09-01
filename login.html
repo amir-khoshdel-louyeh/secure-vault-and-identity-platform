@@ -98,6 +98,26 @@
                         <button type="submit" class="btn-secondary">Register</button>
                     </form>
 
+                    <!-- 2FA Setup During Registration -->
+                    <div id="reg-2fa-setup" style="display: none; margin-top: 20px;">
+                        <h4>Set up Two-Factor Authentication</h4>
+                        <p class="text-sm">Scan the QR code below with your authenticator app.</p>
+                        
+                        <div id="reg-qr-wrapper" style="text-align: center; margin: 15px 0;"></div>
+                        <p class="text-sm" style="text-align: center; word-break: break-all;">Secret Key: <code id="reg-2fa-secret"></code></p>
+                        
+                        <form id="reg-2fa-form">
+                            <div class="form-group">
+                                <label for="reg-totp">Enter 6-digit code:</label>
+                                <input type="text" id="reg-totp" name="totp_code" placeholder="123456" maxlength="6" pattern="\d{6}" required autocomplete="one-time-code">
+                            </div>
+                            <button type="submit" class="btn-primary">Verify & Enable 2FA</button>
+                            <div class="form-sub-actions">
+                                <button type="button" id="skip-2fa-btn" class="btn-link">Skip for now</button>
+                            </div>
+                        </form>
+                    </div>
+
                     <!-- Display Recovery Codes Upon Successful Registration / 2FA Setup -->
                     <div id="recovery-codes-display" class="card" style="display: none;">
                         <h4>Save Your Recovery Codes</h4>
