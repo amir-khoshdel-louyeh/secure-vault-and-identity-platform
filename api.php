@@ -196,6 +196,11 @@ try {
             break;
 
         // --- مدیریت ۲FA (تولید QR و فعال‌سازی) ---
+        case '2fa_status':
+            $res = $auth->get2FAStatus($userId);
+            sendJsonResponse($res['success'], $res['message'] ?? 'موفق', ['enabled' => $res['enabled'] ?? false], $res['success'] ? 200 : 400);
+            break;
+
         case 'setup_2fa':
             $setup = $auth->generate2FASetup($userId);
             sendJsonResponse(true, 'اطلاعات ۲FA تولید شد.', $setup);
@@ -204,6 +209,11 @@ try {
         case 'enable_2fa':
             $code = trim($_POST['code'] ?? '');
             $res = $auth->enable2FA($userId, $code);
+            sendJsonResponse($res['success'], $res['message'], [], $res['success'] ? 200 : 400);
+            break;
+
+        case 'disable_2fa':
+            $res = $auth->disable2FA($userId);
             sendJsonResponse($res['success'], $res['message'], [], $res['success'] ? 200 : 400);
             break;
 
