@@ -422,8 +422,18 @@ document.addEventListener('DOMContentLoaded', () => {
     async function check2FAStatus() {
         const res = await apiRequest('2fa_status');
         const statusText = document.getElementById('2fa-status-text');
+        const setupBtn = document.getElementById('setup-2fa-btn');
+        const disableBtn = document.getElementById('disable-2fa-btn');
+
         if (statusText && res && res.success) {
             statusText.innerText = res.enabled ? 'Enabled' : 'Disabled';
+            if (res.enabled) {
+                if (setupBtn) setupBtn.style.display = 'none';
+                if (disableBtn) disableBtn.style.display = 'inline-block';
+            } else {
+                if (setupBtn) setupBtn.style.display = 'inline-block';
+                if (disableBtn) disableBtn.style.display = 'none';
+            }
         }
     }
 
@@ -440,6 +450,21 @@ document.addEventListener('DOMContentLoaded', () => {
                     qrWrapper.innerText = 'Scan URI: ' + res.otpauth_url;
                 }
                 document.getElementById('2fa-setup-box').style.display = 'block';
+            }
+        });
+    }
+
+    const disable2faBtn = document.getElementById('disable-2fa-btn');
+    if (disable2faBtn) {
+        disable2faBtn.addEventListener('click', async () => {
+            if (confirm('Are you sure you want to disable Two-Factor Authentication?')) {
+                const res = await apiRequest('disable_2fa', 'POST');
+                if (res && res.success) {
+                    alert('2FA successfully disabled.');
+                    check2FAStatus();
+                } else {
+                    alert(res?.message || 'Failed to disable 2FA.');
+                }
             }
         });
     }
