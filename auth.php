@@ -279,6 +279,30 @@ class Auth {
         return ['success' => true, 'message' => 'احراز هویت دو مرحله‌ای با موفقیت فعال شد.'];
     }
 
+    public function get2FAStatus(int $userId): array {
+        $stmt = $this->db->prepare("SELECT is_2fa_enabled FROM users WHERE id = ?");
+        $stmt->execute([$userId]);
+        $user = $stmt->fetch();
+
+        if (!$user) {
+            return ['success' => false, 'message' => 'کاربر یافت نشد.'];
+        }
+
+        return [
+            'success' => true,
+            'enabled' => (bool)$user['is_2fa_enabled']
+        ];
+    }
+
+    public function disable2FA(int $userId): array {
+        $stmt = $this->db->prepare("UPDATE users SET is_2fa_enabled = 0, twofa_secret = NULL WHERE id = ?");
+        $stmt->execute([$userId]);
+
+        $this->logAction($userId, '2FA_DISABLED');
+
+        return ['success' => true, 'message' => 'احراز هویت دو مرحله‌ای غیرفعال شد.'];
+    }
+
     // =========================================================================
     // ۵. مدیریت نشست‌های فعال (Session Management UI)
     // =========================================================================
