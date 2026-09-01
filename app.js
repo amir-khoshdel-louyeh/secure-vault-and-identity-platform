@@ -230,8 +230,23 @@ document.addEventListener('DOMContentLoaded', () => {
                     currentTempToken = res.temp_token;
                     document.getElementById('login-temp-token').value = res.temp_token;
                     document.getElementById('recovery-temp-token').value = res.temp_token;
-                    loginStep1Form.style.display = 'none';
-                    loginStep2Form.style.display = 'block';
+                    
+                    loginStep1Form.style.opacity = '0';
+                    loginStep1Form.style.transition = 'opacity 0.3s ease';
+                    
+                    setTimeout(() => {
+                        loginStep1Form.style.display = 'none';
+                        loginStep2Form.style.display = 'block';
+                        loginStep2Form.style.opacity = '0';
+                        loginStep2Form.style.transition = 'opacity 0.3s ease';
+                        
+                        // Small delay to allow display block to render before changing opacity
+                        setTimeout(() => {
+                            loginStep2Form.style.opacity = '1';
+                            const totpInput = document.getElementById('login-totp');
+                            if (totpInput) totpInput.focus();
+                        }, 50);
+                    }, 300);
                 } else {
                     window.location.href = 'dashboard.html';
                 }
@@ -265,14 +280,35 @@ document.addEventListener('DOMContentLoaded', () => {
     const backToTotpBtn = document.getElementById('back-to-totp-btn');
     if (toggleRecoveryBtn) {
         toggleRecoveryBtn.addEventListener('click', () => {
-            loginStep2Form.style.display = 'none';
-            loginRecoveryForm.style.display = 'block';
+            loginStep2Form.style.opacity = '0';
+            loginStep2Form.style.transition = 'opacity 0.3s ease';
+            setTimeout(() => {
+                loginStep2Form.style.display = 'none';
+                loginRecoveryForm.style.display = 'block';
+                loginRecoveryForm.style.opacity = '0';
+                loginRecoveryForm.style.transition = 'opacity 0.3s ease';
+                setTimeout(() => {
+                    loginRecoveryForm.style.opacity = '1';
+                    const recoveryInput = document.getElementById('recovery-code');
+                    if (recoveryInput) recoveryInput.focus();
+                }, 50);
+            }, 300);
         });
     }
     if (backToTotpBtn) {
         backToTotpBtn.addEventListener('click', () => {
-            loginRecoveryForm.style.display = 'none';
-            loginStep2Form.style.display = 'block';
+            loginRecoveryForm.style.opacity = '0';
+            loginRecoveryForm.style.transition = 'opacity 0.3s ease';
+            setTimeout(() => {
+                loginRecoveryForm.style.display = 'none';
+                loginStep2Form.style.display = 'block';
+                loginStep2Form.style.opacity = '0';
+                setTimeout(() => {
+                    loginStep2Form.style.opacity = '1';
+                    const totpInput = document.getElementById('login-totp');
+                    if (totpInput) totpInput.focus();
+                }, 50);
+            }, 300);
         });
     }
 
