@@ -98,13 +98,48 @@ class Auth {
         $userId = (int)$this->db->lastInsertId();
 
         $this->logAction($userId, 'USER_REGISTERED');
+        
+        $qrCodeDataUri = $this->tfa->getQRCodeImageAsDataUri($email, $totpSecret);
+        $_SESSION['temp_reg_user_id'] = $userId;
 
         return [
             'success'       => true,
-            'message'       => 'ثبت‌نام با موفقیت انجام شد. کد پشتیبان خود را حتماً ذخیره کنید.',
+            'message'       => 'ثبت‌نام با موفقیت انجام شد. می‌توانید ۲FA را فعال کرده و کد پشتیبان را ذخیره کنید.',
             'secret'        => $totpSecret,
+            'qr_code'       => $qrCodeDataUri,
             'recovery_code' => $rawRecoveryCode
         ];
+    }
+
+    // =========================================================================
+    // ۲.۵. تأیید 2FA پس از ثبت‌نام
+    // =========================================================================
+
+    public function confirmRegistration2FA(string $code): array {
+        if (!isset($_SESSION['temp_reg_user_id'])) {
+            return ['success' => false, 'message' => 'نشست ثبت‌نام یافت نشد. لطفاً از طریق پنل کاربری اقدام کنید.'];
+        }
+
+        $userId = $_SESSION['temp_reg_user_id'];
+        $stmt = $this->db->prepare("SELECT twofa_secret FROM users WHERE id = ?");
+        $stmt->execute([$userId]);
+        $user = $stmt->fetch();
+
+        if (!$user || !$user['twofa_secret']) {
+            return ['success' => false, 'message' => 'اطلاعات کاربر نامعتبر است.'];
+        }
+
+        if (!$this->tfa->verifyCode($user['twofa_secret'], $code)) {
+            return ['success' => false, 'message' => 'کد تأیید وارد شده نادرست است.'];
+        }
+
+        $stmt = $this->db->prepare("UPDATE users SET is_2fa_enabled = 1 WHERE id = ?");
+        $stmt->execute([$userId]);
+
+        unset($_SESSION['temp_reg_user_id']);
+        $this->logAction($userId, '2FA_ENABLED_DURING_REG');
+
+        return ['success' => true, 'message' => 'احراز هویت دو مرحله‌ای با موفقیت فعال شد.'];
     }
 
     // =========================================================================
