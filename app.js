@@ -295,6 +295,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    let currentRegRecoveryCode = ''; // Temporarily hold the recovery code
+
     if (registerForm) {
         registerForm.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -307,15 +309,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const res = await apiRequest('register', 'POST', formData);
 
             if (res && res.success) {
-                registerForm.reset();
-                if (res.recovery_codes && res.recovery_codes.length > 0) {
-                    const displayBox = document.getElementById('recovery-codes-display');
-                    const listContainer = document.getElementById('codes-list-container');
-                    listContainer.innerHTML = res.recovery_codes.map(c => `<code>${c}</code>`).join('<br>');
-                    displayBox.style.display = 'block';
-                } else {
-                    successBox.innerText = 'Registration successful! You can now sign in.';
-                    successBox.style.display = 'block';
+                registerForm.style.display = 'none'; // Hide register form
+                
+                // Store recovery code for later
+                currentRegRecoveryCode = res.recovery_code || '';
+                
+                // Show 2FA Setup
+                const setupBox = document.getElementById('reg-2fa-setup');
+                if (setupBox) {
+                    setupBox.style.display = 'block';
+                    document.getElementById('reg-qr-wrapper').innerHTML = `<img src="${res.qr_code}" alt="2FA QR Code">`;
+                    document.getElementById('reg-2fa-secret').innerText = res.secret;
                 }
             } else {
                 alertBox.innerText = res?.message || 'Registration failed.';
@@ -324,11 +328,48 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    const reg2faForm = document.getElementById('reg-2fa-form');
+    if (reg2faForm) {
+        reg2faForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const alertBox = document.getElementById('register-alert');
+            alertBox.style.display = 'none';
+
+            const formData = new FormData(reg2faForm);
+            const res = await apiRequest('confirm_reg_2fa', 'POST', formData);
+
+            if (res && res.success) {
+                document.getElementById('reg-2fa-setup').style.display = 'none';
+                
+                const displayBox = document.getElementById('recovery-codes-display');
+                const listContainer = document.getElementById('codes-list-container');
+                listContainer.innerHTML = `<code>${currentRegRecoveryCode}</code>`;
+                displayBox.style.display = 'block';
+            } else {
+                alertBox.innerText = res?.message || 'Invalid 2FA code.';
+                alertBox.style.display = 'block';
+            }
+        });
+    }
+
+    const skip2faBtn = document.getElementById('skip-2fa-btn');
+    if (skip2faBtn) {
+        skip2faBtn.addEventListener('click', () => {
+            document.getElementById('reg-2fa-setup').style.display = 'none';
+            
+            const displayBox = document.getElementById('recovery-codes-display');
+            const listContainer = document.getElementById('codes-list-container');
+            listContainer.innerHTML = `<code>${currentRegRecoveryCode}</code>`;
+            displayBox.style.display = 'block';
+        });
+    }
+
     const confirmSavedCodesBtn = document.getElementById('confirm-saved-codes-btn');
     if (confirmSavedCodesBtn) {
         confirmSavedCodesBtn.addEventListener('click', () => {
             document.getElementById('recovery-codes-display').style.display = 'none';
             alert('Please sign in using your username and password.');
+            window.location.reload();
         });
     }
 
