@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/config.php';
+require_once dirname(__DIR__) . '/config/config.php';
 
 class Crypto {
     private static string $algo = 'aes-256-gcm';

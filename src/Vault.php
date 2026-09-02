@@ -1,7 +1,7 @@
 <?php
-require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/db.php';
-require_once __DIR__ . '/crypto.php';
+require_once dirname(__DIR__) . '/config/config.php';
+require_once __DIR__ . '/DB.php';
+require_once __DIR__ . '/Crypto.php';
 
 class Vault {
     private PDO $db;

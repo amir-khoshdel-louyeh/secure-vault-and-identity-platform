@@ -108,7 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 2. Unified API Request Handler
     // ==========================================
     async function apiRequest(action, method = 'GET', data = null) {
-        let url = `api.php?action=${encodeURIComponent(action)}`;
+        let url = `../api/api.php?action=${encodeURIComponent(action)}`;
         const options = {
             method: method,
             headers: {}
@@ -524,7 +524,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>${(file.file_size / 1024).toFixed(1)} KB</td>
                 <td>${file.created_at}</td>
                 <td>
-                    <a href="api.php?action=download_file&id=${file.id}" target="_blank" class="btn-primary" style="padding: 4px 8px; text-decoration: none;">Download</a>
+                    <a href="../api/api.php?action=download_file&id=${file.id}" target="_blank" class="btn-primary" style="padding: 4px 8px; text-decoration: none;">Download</a>
                     <button class="btn-share-item btn-secondary" data-type="file" data-id="${file.id}">Share</button>
                     <button class="btn-delete-file btn-danger" data-id="${file.id}">Trash</button>
                 </td>
@@ -782,7 +782,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('shared-file-size').innerText = (res.file.file_size / 1024).toFixed(1) + ' KB';
 
                 document.getElementById('download-shared-file-btn').onclick = () => {
-                    window.location.href = `api.php?action=download_shared_file&token=${encodeURIComponent(token)}`;
+                    window.location.href = `download.php?token=${encodeURIComponent(token)}`;
                 };
             } else if (res.type === 'note') {
                 const noteActions = document.getElementById('shared-note-actions');

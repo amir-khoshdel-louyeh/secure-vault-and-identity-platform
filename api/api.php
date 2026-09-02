@@ -6,12 +6,12 @@ if (($_REQUEST['action'] ?? '') !== 'download_file') {
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
 
-require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/db.php';
-require_once __DIR__ . '/crypto.php';
-require_once __DIR__ . '/auth.php';
-require_once __DIR__ . '/vault.php';
-require_once __DIR__ . '/sharemanager.php';
+require_once dirname(__DIR__) . '/config/config.php';
+require_once dirname(__DIR__) . '/src/DB.php';
+require_once dirname(__DIR__) . '/src/Crypto.php';
+require_once dirname(__DIR__) . '/src/Auth.php';
+require_once dirname(__DIR__) . '/src/Vault.php';
+require_once dirname(__DIR__) . '/src/ShareManager.php';
 
 // تابع کمکی برای ارسال پاسخ JSON و خروج
 function sendJsonResponse(bool $success, string $message, array $extraData = [], int $httpCode = 200): void {

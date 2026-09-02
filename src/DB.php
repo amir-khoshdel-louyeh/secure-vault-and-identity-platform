@@ -1,6 +1,6 @@
 <?php
 // config.php بعداً کلیدهای امنیتی را نگه خواهد داشت
-require_once __DIR__ . '/config.php';
+require_once dirname(__DIR__) . '/config/config.php';
 
 function getDBConnection(): PDO {
     static $pdo = null;
