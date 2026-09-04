@@ -220,6 +220,64 @@ class ShareManager {
         }
     }
 
+    /**
+     * List all share links created by a user with enriched item names.
+     */
+    public function getUserShareTokens(int $userId): array {
+        $stmt = $this->db->prepare("SELECT * FROM share_tokens WHERE user_id = ? ORDER BY created_at DESC");
+        $stmt->execute([$userId]);
+        $tokens = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($tokens as &$row) {
+            $itemName = 'Unknown';
+            $isOrphan = false;
+            if ($row['item_type'] === 'file') {
+                $s2 = $this->db->prepare("SELECT original_name FROM files WHERE id = ?");
+                $s2->execute([$row['item_id']]);
+                $f = $s2->fetch();
+                $itemName = $f ? $f['original_name'] : '(deleted file #' . $row['item_id'] . ')';
+                if (!$f) $isOrphan = true;
+            } else {
+                $s2 = $this->db->prepare("SELECT title FROM notes WHERE id = ?");
+                $s2->execute([$row['item_id']]);
+                $n = $s2->fetch();
+                $itemName = $n ? $n['title'] : '(deleted note #' . $row['item_id'] . ')';
+                if (!$n) $isOrphan = true;
+            }
+            $row['item_name'] = $itemName;
+            $row['is_orphan'] = $isOrphan;
+            // Derived status
+            $expired = strtotime($row['expires_at']) < time();
+            $exhausted = $row['max_uses'] > 0 && $row['uses_count'] >= $row['max_uses'];
+            if ($expired) {
+                $row['status'] = 'expired';
+            } elseif ($exhausted) {
+                $row['status'] = 'exhausted';
+            } else {
+                $row['status'] = 'active';
+            }
+            $row['remaining_uses'] = $row['max_uses'] > 0 ? max(0, (int)$row['max_uses'] - (int)$row['uses_count']) : -1;
+        }
+        unset($row);
+
+        return $tokens;
+    }
+
+    /**
+     * Revoke (delete) a share link owned by the user.
+     */
+    public function revokeShareToken(int $userId, int $tokenId): array {
+        $stmt = $this->db->prepare("SELECT id FROM share_tokens WHERE id = ? AND user_id = ?");
+        $stmt->execute([$tokenId, $userId]);
+        if (!$stmt->fetch()) {
+            return ['success' => false, 'message' => 'Share link not found or you do not have permission to revoke it.'];
+        }
+        $del = $this->db->prepare("DELETE FROM share_tokens WHERE id = ? AND user_id = ?");
+        $del->execute([$tokenId, $userId]);
+        $this->logAction($userId, 'REVOKE_SHARE_TOKEN');
+        return ['success' => true, 'message' => 'Share link revoked successfully.'];
+    }
+
     private function logAction(?int $userId, string $action): void {
         $stmt = $this->db->prepare("INSERT INTO audit_logs (user_id, action, ip_address, user_agent) VALUES (?, ?, ?, ?)");
         $stmt->execute([
