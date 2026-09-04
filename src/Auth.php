@@ -15,7 +15,7 @@ class Auth {
     }
 
     // =========================================================================
-    // ۱. محدودکننده نرخ درخواست (Rate Limiting & Brute Force Protection)
+    // 1. Rate Limiting & Brute Force Protection
     // =========================================================================
 
     public function checkRateLimit(string $action = 'login', int $maxAttempts = 5, int $decayMinutes = 5): array {
@@ -36,7 +36,7 @@ class Auth {
                 $remaining = ceil(($decayMinutes * 60 - (time() - $lastAttempt)) / 60);
                 return [
                     'allowed' => false,
-                    'message' => "به دلیل تلاش‌های ناموفق متعدد، حساب شما موقتاً مسدود شد. لطفاً {$remaining} دقیقه دیگر تلاش کنید."
+                    'message' => "Due to multiple failed attempts, your account is temporarily blocked. Please try again in {$remaining} minutes."
                 ];
             }
         }
@@ -61,31 +61,31 @@ class Auth {
     }
 
     // =========================================================================
-    // ۲. ثبت‌نام و تولید Master Recovery Code
+    // 2. Registration and Master Recovery Code Generation
     // =========================================================================
 
     public function register(string $username, string $email, string $password): array {
         if (empty($username) || empty($email) || empty($password)) {
-            return ['success' => false, 'message' => 'لطفاً تمام فیلدها را پر کنید.'];
+            return ['success' => false, 'message' => 'Please fill in all fields.'];
         }
 
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            return ['success' => false, 'message' => 'ایمیل وارد شده معتبر نیست.'];
+            return ['success' => false, 'message' => 'Invalid email address.'];
         }
 
         if (strlen($password) < 8) {
-            return ['success' => false, 'message' => 'کلمه عبور باید حداقل ۸ کاراکتر باشد.'];
+            return ['success' => false, 'message' => 'Password must be at least 8 characters long.'];
         }
 
         $stmt = $this->db->prepare("SELECT id FROM users WHERE username = ? OR email = ?");
         $stmt->execute([$username, $email]);
         if ($stmt->fetch()) {
-            return ['success' => false, 'message' => 'نام کاربری یا ایمیل قبلاً ثبت شده است.'];
+            return ['success' => false, 'message' => 'Username or email is already registered.'];
         }
 
         $passwordHash = password_hash($password, PASSWORD_BCRYPT, ['cost' => 12]);
 
-        // تولید کد اضطراری/پشتیبان (Recovery Code)
+        // Generate Emergency/Recovery Code
         $rawRecoveryCode = strtoupper(bin2hex(random_bytes(4)) . '-' . bin2hex(random_bytes(4)));
         $recoveryCodeHash = password_hash($rawRecoveryCode, PASSWORD_BCRYPT);
 
@@ -104,7 +104,7 @@ class Auth {
 
         return [
             'success'       => true,
-            'message'       => 'ثبت‌نام با موفقیت انجام شد. می‌توانید ۲FA را فعال کرده و کد پشتیبان را ذخیره کنید.',
+            'message'       => 'Registration successful. You can enable 2FA and save your recovery code.',
             'secret'        => $totpSecret,
             'qr_code'       => $qrCodeDataUri,
             'recovery_code' => $rawRecoveryCode
@@ -112,12 +112,12 @@ class Auth {
     }
 
     // =========================================================================
-    // ۲.۵. تأیید 2FA پس از ثبت‌نام
+    // 2.5. Verify 2FA after Registration
     // =========================================================================
 
     public function confirmRegistration2FA(string $code): array {
         if (!isset($_SESSION['temp_reg_user_id'])) {
-            return ['success' => false, 'message' => 'نشست ثبت‌نام یافت نشد. لطفاً از طریق پنل کاربری اقدام کنید.'];
+            return ['success' => false, 'message' => 'Registration session not found. Please proceed via the user panel.'];
         }
 
         $userId = $_SESSION['temp_reg_user_id'];
@@ -126,11 +126,11 @@ class Auth {
         $user = $stmt->fetch();
 
         if (!$user || !$user['twofa_secret']) {
-            return ['success' => false, 'message' => 'اطلاعات کاربر نامعتبر است.'];
+            return ['success' => false, 'message' => 'Invalid user information.'];
         }
 
         if (!$this->tfa->verifyCode($user['twofa_secret'], $code)) {
-            return ['success' => false, 'message' => 'کد تأیید وارد شده نادرست است.'];
+            return ['success' => false, 'message' => 'Incorrect verification code.'];
         }
 
         $stmt = $this->db->prepare("UPDATE users SET is_2fa_enabled = 1 WHERE id = ?");
@@ -139,11 +139,11 @@ class Auth {
         unset($_SESSION['temp_reg_user_id']);
         $this->logAction($userId, '2FA_ENABLED_DURING_REG');
 
-        return ['success' => true, 'message' => 'احراز هویت دو مرحله‌ای با موفقیت فعال شد.'];
+        return ['success' => true, 'message' => 'Two-factor authentication enabled successfully.'];
     }
 
     // =========================================================================
-    // ۳. بازیابی حساب با Recovery Code
+    // 3. Account Recovery with Recovery Code
     // =========================================================================
 
     public function recoverAccount(string $identity, string $recoveryCode, string $newPassword): array {
@@ -152,23 +152,23 @@ class Auth {
         $user = $stmt->fetch();
 
         if (!$user || empty($user['recovery_code_hash'])) {
-            return ['success' => false, 'message' => 'اطلاعات وارد شده معتبر نیست.'];
+            return ['success' => false, 'message' => 'Invalid information provided.'];
         }
 
         if (!password_verify($recoveryCode, $user['recovery_code_hash'])) {
             $this->logAction($user['id'], 'RECOVERY_FAILED');
-            return ['success' => false, 'message' => 'کد پشتیبان وارد شده نادرست است.'];
+            return ['success' => false, 'message' => 'Incorrect recovery code.'];
         }
 
         if (strlen($newPassword) < 8) {
-            return ['success' => false, 'message' => 'رمز عبور جدید باید حداقل ۸ کاراکتر باشد.'];
+            return ['success' => false, 'message' => 'New password must be at least 8 characters long.'];
         }
 
         $newPasswordHash = password_hash($newPassword, PASSWORD_BCRYPT, ['cost' => 12]);
         $newRawRecoveryCode = strtoupper(bin2hex(random_bytes(4)) . '-' . bin2hex(random_bytes(4)));
         $newRecoveryHash = password_hash($newRawRecoveryCode, PASSWORD_BCRYPT);
 
-        // بازنشانی 2FA و رمز عبور
+        // Reset 2FA and password
         $stmt = $this->db->prepare(
             "UPDATE users SET password_hash = ?, is_2fa_enabled = 0, recovery_code_hash = ? WHERE id = ?"
         );
@@ -178,13 +178,13 @@ class Auth {
 
         return [
             'success'          => true,
-            'message'          => 'حساب شما بازیابی شد و 2FA غیرفعال گردید.',
+            'message'          => 'Your account has been recovered and 2FA disabled.',
             'new_recovery_code' => $newRawRecoveryCode
         ];
     }
 
     // =========================================================================
-    // ۴. ورود دو مرحله‌ای و مدیریت نشست‌ها
+    // 4. Two-Step Login and Session Management
     // =========================================================================
 
     public function loginStep1(string $identity, string $password): array {
@@ -200,7 +200,7 @@ class Auth {
         if (!$user || !password_verify($password, $user['password_hash'])) {
             $this->hitRateLimit('login');
             $this->logAction(null, 'LOGIN_FAILED_CREDENTIALS');
-            return ['success' => false, 'message' => 'نام کاربری یا کلمه عبور اشتباه است.'];
+            return ['success' => false, 'message' => 'Incorrect username or password.'];
         }
 
         if ($user['is_2fa_enabled']) {
@@ -208,7 +208,7 @@ class Auth {
             return [
                 'success'      => true,
                 'requires_2fa' => true,
-                'message'      => 'کد ۶ رقمی Authenticator را وارد کنید.'
+                'message'      => 'Enter the 6-digit Authenticator code.'
             ];
         }
 
@@ -219,7 +219,7 @@ class Auth {
 
     public function loginStep2(string $code): array {
         if (!isset($_SESSION['2fa_pending_user_id'])) {
-            return ['success' => false, 'message' => 'نشست نامعتبر است. مجدداً تلاش کنید.'];
+            return ['success' => false, 'message' => 'Invalid session. Please try again.'];
         }
 
         $userId = $_SESSION['2fa_pending_user_id'];
@@ -228,12 +228,12 @@ class Auth {
         $user = $stmt->fetch();
 
         if (!$user || !$user['twofa_secret']) {
-            return ['success' => false, 'message' => 'خطا در بازیابی اطلاعات 2FA.'];
+            return ['success' => false, 'message' => 'Error retrieving 2FA information.'];
         }
 
         if (!$this->tfa->verifyCode($user['twofa_secret'], $code)) {
             $this->logAction($userId, 'LOGIN_FAILED_2FA');
-            return ['success' => false, 'message' => 'کد ۲FA وارد شده اشتباه است.'];
+            return ['success' => false, 'message' => 'Incorrect 2FA code.'];
         }
 
         unset($_SESSION['2fa_pending_user_id']);
@@ -261,13 +261,13 @@ class Auth {
 
     public function enable2FA(int $userId, string $code): array {
         if (!isset($_SESSION['temp_2fa_secret'])) {
-            return ['success' => false, 'message' => 'کلید موقت یافت نشد.'];
+            return ['success' => false, 'message' => 'Temporary key not found.'];
         }
 
         $secret = $_SESSION['temp_2fa_secret'];
 
         if (!$this->tfa->verifyCode($secret, $code)) {
-            return ['success' => false, 'message' => 'کد تأیید نادرست است.'];
+            return ['success' => false, 'message' => 'Incorrect verification code.'];
         }
 
         $stmt = $this->db->prepare("UPDATE users SET twofa_secret = ?, is_2fa_enabled = 1 WHERE id = ?");
@@ -276,7 +276,7 @@ class Auth {
         unset($_SESSION['temp_2fa_secret']);
         $this->logAction($userId, '2FA_ENABLED');
 
-        return ['success' => true, 'message' => 'احراز هویت دو مرحله‌ای با موفقیت فعال شد.'];
+        return ['success' => true, 'message' => 'Two-factor authentication enabled successfully.'];
     }
 
     public function get2FAStatus(int $userId): array {
@@ -285,7 +285,7 @@ class Auth {
         $user = $stmt->fetch();
 
         if (!$user) {
-            return ['success' => false, 'message' => 'کاربر یافت نشد.'];
+            return ['success' => false, 'message' => 'User not found.'];
         }
 
         return [
@@ -300,11 +300,11 @@ class Auth {
 
         $this->logAction($userId, '2FA_DISABLED');
 
-        return ['success' => true, 'message' => 'احراز هویت دو مرحله‌ای غیرفعال شد.'];
+        return ['success' => true, 'message' => 'Two-factor authentication disabled.'];
     }
 
     // =========================================================================
-    // ۵. مدیریت نشست‌های فعال (Session Management UI)
+    // 5. Active Sessions Management (Session Management UI)
     // =========================================================================
 
     public function getUserSessions(int $userId): array {
@@ -315,7 +315,7 @@ class Auth {
 
         foreach ($sessions as &$sess) {
             $sess['is_current'] = ($sess['session_id'] === $currentSessionId);
-            unset($sess['session_id']); // عدم ارسال هش کامل session_id به کلاینت
+            unset($sess['session_id']); // Do not send full session_id hash to the client
         }
 
         return $sessions;
@@ -326,7 +326,7 @@ class Auth {
         $stmt->execute([$sessionId, $userId]);
 
         $this->logAction($userId, 'SESSION_REVOKED');
-        return ['success' => true, 'message' => 'نشست با موفقیت خاتمه یافت.'];
+        return ['success' => true, 'message' => 'Session terminated successfully.'];
     }
 
     public function logout(): void {
@@ -359,7 +359,7 @@ class Auth {
         $ip = $_SERVER['REMOTE_ADDR'] ?? 'UNKNOWN';
         $agent = $_SERVER['HTTP_USER_AGENT'] ?? 'UNKNOWN';
 
-        // ثبت نشست در دیتابیس
+        // Register session in the database
         $stmt = $this->db->prepare(
             "INSERT INTO user_sessions (session_id, user_id, ip_address, user_agent) 
              VALUES (?, ?, ?, ?) 
@@ -372,7 +372,7 @@ class Auth {
         return [
             'success'      => true,
             'requires_2fa' => false,
-            'message'      => 'ورود با موفقیت انجام شد.'
+            'message'      => 'Login successful.'
         ];
     }
 

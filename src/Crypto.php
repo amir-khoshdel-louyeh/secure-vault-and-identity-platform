@@ -5,23 +5,23 @@ class Crypto {
     private static string $algo = 'aes-256-gcm';
 
     /**
-     * دریافت کلید خام ۳۲ بایتی از کلید Hex تعریف‌شده در کانفیگ
+     * Get 32-byte raw key from the Hex key defined in config
      */
     private static function getRawKey(): string {
         $key = hex2bin(ENCRYPTION_KEY);
         if (strlen($key) !== 32) {
-            throw new Exception("کلید رمزنگاری باید ۲۵۶ بیتی (۶۴ کاراکتر Hex) باشد.");
+            throw new Exception("Encryption key must be 256-bit (64 Hex characters).");
         }
         return $key;
     }
 
     // =========================================================================
-    // ۱. رمزنگاری و رمزگشایی متون (برای نوت‌ها با AES-256-GCM)
+    // 1. Encrypt and Decrypt Text (for Notes with AES-256-GCM)
     // =========================================================================
 
     /**
-     * رمزنگاری یک رشته متنی
-     * @return array شامل ciphertext (بیس۶۴)، iv (بیس۶۴) و tag (بیس۶۴)
+     * Encrypt a text string
+     * @return array Contains ciphertext (base64), iv (base64) and tag (base64)
      */
     public static function encryptText(string $plainText): array {
         $ivLength = openssl_cipher_iv_length(self::$algo);
@@ -38,7 +38,7 @@ class Crypto {
         );
 
         if ($cipherText === false) {
-            throw new Exception("خطا در رمزنگاری متن.");
+            throw new Exception("Error encrypting text.");
         }
 
         return [
@@ -49,7 +49,7 @@ class Crypto {
     }
 
     /**
-     * رمزگشایی یک رشته متنی
+     * Decrypt a text string
      */
     public static function decryptText(string $cipherTextBase64, string $ivBase64, string $tagBase64 = ''): string {
         $cipherText = base64_decode($cipherTextBase64);
@@ -66,24 +66,24 @@ class Crypto {
         );
 
         if ($plainText === false) {
-            throw new Exception("خطا در رمزگشایی متن یا کلید/تگ احراز هویت نامعتبر است.");
+            throw new Exception("Error decrypting text or invalid authentication key/tag.");
         }
 
         return $plainText;
     }
 
     // =========================================================================
-    // ۲. رمزنگاری و رمزگشایی فایل‌ها به صورت Streaming ایمن
+    // 2. Encrypt and Decrypt Files via Secure Streaming
     // =========================================================================
 
     /**
-     * رمزنگاری فایل کامل و ذخیره آن روی دیسک
-     * @return array شامل IV و Authentication Tag
+     * Encrypt full file and save it to disk
+     * @return array Contains IV and Authentication Tag
      */
     public static function encryptFile(string $sourcePath, string $destPath): array {
         $plainData = file_get_contents($sourcePath);
         if ($plainData === false) {
-            throw new Exception("امکان خواندن فایل مبدا وجود ندارد.");
+            throw new Exception("Unable to read the source file.");
         }
 
         $ivLength = openssl_cipher_iv_length(self::$algo);
@@ -100,11 +100,11 @@ class Crypto {
         );
 
         if ($encryptedData === false) {
-            throw new Exception("خطا در رمزنگاری فایل.");
+            throw new Exception("Error encrypting the file.");
         }
 
         if (file_put_contents($destPath, $encryptedData) === false) {
-            throw new Exception("امکان ذخیره‌سازی فایل رمز شده وجود ندارد.");
+            throw new Exception("Unable to save the encrypted file.");
         }
 
         return [
@@ -114,12 +114,12 @@ class Crypto {
     }
 
     /**
-     * خواندن فایل رمز شده از دیسک، رمزگشایی و ارسال مستقیم به خروجی (Stream به مرورگر)
+     * Read encrypted file from disk, decrypt, and stream directly to output (browser stream)
      */
     public static function decryptFileToStream(string $sourcePath, string $ivBase64, string $tagBase64 = ''): void {
         $encryptedData = file_get_contents($sourcePath);
         if ($encryptedData === false) {
-            throw new Exception("فایل رمزنگاری‌شده یافت نشد.");
+            throw new Exception("Encrypted file not found.");
         }
 
         $iv = base64_decode($ivBase64);
@@ -135,7 +135,7 @@ class Crypto {
         );
 
         if ($decryptedData === false) {
-            throw new Exception("خطا در رمزگشایی فایل یا دستکاری داده‌ها detected.");
+            throw new Exception("Error decrypting file or data tampering detected.");
         }
 
         echo $decryptedData;

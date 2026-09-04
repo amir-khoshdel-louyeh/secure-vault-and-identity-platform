@@ -1,5 +1,5 @@
 <?php
-// ۱. تنظیم هدرهای پاسخ و امنیت (در صورت دانلود، هدر JSON ارسال نمی‌شود)
+// 1. Set response headers and security (If downloading, JSON header is not sent)
 if (($_REQUEST['action'] ?? '') !== 'download_file') {
     header('Content-Type: application/json; charset=utf-8');
 }
@@ -13,7 +13,7 @@ require_once dirname(__DIR__) . '/src/Auth.php';
 require_once dirname(__DIR__) . '/src/Vault.php';
 require_once dirname(__DIR__) . '/src/ShareManager.php';
 
-// تابع کمکی برای ارسال پاسخ JSON و خروج
+// Helper function to send JSON response and exit
 function sendJsonResponse(bool $success, string $message, array $extraData = [], int $httpCode = 200): void {
     http_response_code($httpCode);
     echo json_encode(array_merge([
@@ -23,7 +23,7 @@ function sendJsonResponse(bool $success, string $message, array $extraData = [],
     exit;
 }
 
-// ۲. راه‌اندازی سشن امن
+// 2. Initialize secure session
 if (session_status() === PHP_SESSION_NONE) {
     session_start([
         'cookie_httponly' => true,
@@ -36,20 +36,20 @@ $auth = new Auth();
 $action = $_REQUEST['action'] ?? '';
 
 // ==========================================
-// ۳. مسیرهای عمومی (بدون نیاز به لاگین)
+// 3. Public Routes (No login required)
 // ==========================================
 
-// ورود مرحله ۱ (نام کاربری و کلمه عبور)
+// Login Step 1 (Username and Password)
 if ($action === 'login' || $action === 'login_step1') {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        sendJsonResponse(false, 'روش درخواست نامعتبر است.', [], 405);
+        sendJsonResponse(false, 'Invalid request method.', [], 405);
     }
 
     $identity = trim($_POST['identity'] ?? $_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
 
     if (empty($identity) || empty($password)) {
-        sendJsonResponse(false, 'لطفاً نام کاربری و کلمه عبور را وارد کنید.', [], 400);
+        sendJsonResponse(false, 'Please enter username and password.', [], 400);
     }
 
     $result = $auth->loginStep1($identity, $password);
@@ -62,15 +62,15 @@ if ($action === 'login' || $action === 'login_step1') {
     }
 }
 
-// ورود مرحله ۲ (تأیید کد TOTP)
+// Login Step 2 (Verify TOTP Code)
 if ($action === 'login_step2') {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        sendJsonResponse(false, 'روش درخواست نامعتبر است.', [], 405);
+        sendJsonResponse(false, 'Invalid request method.', [], 405);
     }
 
     $code = trim($_POST['code'] ?? $_POST['totp_code'] ?? '');
     if (empty($code)) {
-        sendJsonResponse(false, 'لطفاً کد ۶ رقمی را وارد کنید.', [], 400);
+        sendJsonResponse(false, 'Please enter the 6-digit code.', [], 400);
     }
 
     $result = $auth->loginStep2($code);
@@ -81,10 +81,10 @@ if ($action === 'login_step2') {
     }
 }
 
-// ثبت‌نام کاربر جدید
+// Register New User
 if ($action === 'register') {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        sendJsonResponse(false, 'روش درخواست نامعتبر است.', [], 405);
+        sendJsonResponse(false, 'Invalid request method.', [], 405);
     }
 
     $username = trim($_POST['username'] ?? '');
@@ -107,15 +107,15 @@ if ($action === 'register') {
     }
 }
 
-// تأیید 2FA پس از ثبت‌نام
+// Confirm 2FA After Registration
 if ($action === 'confirm_reg_2fa') {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        sendJsonResponse(false, 'روش درخواست نامعتبر است.', [], 405);
+        sendJsonResponse(false, 'Invalid request method.', [], 405);
     }
 
     $code = trim($_POST['code'] ?? $_POST['totp_code'] ?? '');
     if (empty($code)) {
-        sendJsonResponse(false, 'لطفاً کد ۶ رقمی را وارد کنید.', [], 400);
+        sendJsonResponse(false, 'Please enter the 6-digit code.', [], 400);
     }
 
     $result = $auth->confirmRegistration2FA($code);
@@ -126,10 +126,10 @@ if ($action === 'confirm_reg_2fa') {
     }
 }
 
-// بازیابی حساب با Recovery Code
+// Recover Account with Recovery Code
 if ($action === 'recover_account') {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        sendJsonResponse(false, 'روش درخواست نامعتبر است.', [], 405);
+        sendJsonResponse(false, 'Invalid request method.', [], 405);
     }
 
     $identity     = trim($_POST['identity'] ?? $_POST['username'] ?? '');
@@ -147,63 +147,63 @@ if ($action === 'recover_account') {
 }
 
 // ==========================================
-// ۴. بررسی احراز هویت برای سایر مسیرها
+// 4. Check Authentication for other routes
 // ==========================================
 $isLoggedIn = isset($_SESSION['user_id']);
 
 if (!$isLoggedIn) {
-    sendJsonResponse(false, 'لطفاً ابتدا وارد حساب کاربری خود شوید.', [], 401);
+    sendJsonResponse(false, 'Please log in to your account first.', [], 401);
 }
 
 $userId = $_SESSION['user_id'];
 
-// ساخت توکن CSRF در صورت عدم وجود
+// Generate CSRF token if not exists
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
 // ==========================================
-// ۵. اعتبارسنجی توکن CSRF (برای درخواست‌های تغییر دهنده POST)
+// 5. Validate CSRF Token (for POST requests)
 // ==========================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $clientCsrf = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
     if (empty($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $clientCsrf)) {
-        sendJsonResponse(false, 'اعتبارسنجی توکن امنیت (CSRF) با خطا مواجه شد.', [], 403);
+        sendJsonResponse(false, 'Security token validation (CSRF) failed.', [], 403);
     }
 }
 
 // ==========================================
-// ۶. مسیریابی درخواست‌های احرازهویت‌شده
+// 6. Route Authenticated Requests
 // ==========================================
 try {
     $vault = new Vault();
 
     switch ($action) {
 
-        // --- خروج از حساب ---
+        // --- Logout ---
         case 'logout':
             $auth->logout();
-            sendJsonResponse(true, 'با موفقیت از سیستم خارج شدید.');
+            sendJsonResponse(true, 'Logged out successfully.');
             break;
 
-        // --- دریافت اطلاعات کاربر و CSRF ---
+        // --- Get User Info and CSRF ---
         case 'get_user_info':
-            sendJsonResponse(true, 'اطلاعات دریافت شد.', [
+            sendJsonResponse(true, 'Information retrieved successfully.', [
                 'user_id'    => $userId,
                 'username'   => $_SESSION['username'] ?? '',
                 'csrf_token' => $_SESSION['csrf_token']
             ]);
             break;
 
-        // --- مدیریت ۲FA (تولید QR و فعال‌سازی) ---
+        // --- Manage 2FA (Generate QR and Enable) ---
         case '2fa_status':
             $res = $auth->get2FAStatus($userId);
-            sendJsonResponse($res['success'], $res['message'] ?? 'موفق', ['enabled' => $res['enabled'] ?? false], $res['success'] ? 200 : 400);
+            sendJsonResponse($res['success'], $res['message'] ?? 'Success', ['enabled' => $res['enabled'] ?? false], $res['success'] ? 200 : 400);
             break;
 
         case 'setup_2fa':
             $setup = $auth->generate2FASetup($userId);
-            sendJsonResponse(true, 'اطلاعات ۲FA تولید شد.', $setup);
+            sendJsonResponse(true, '2FA information generated.', $setup);
             break;
 
         case 'enable_2fa':
@@ -217,10 +217,10 @@ try {
             sendJsonResponse($res['success'], $res['message'], [], $res['success'] ? 200 : 400);
             break;
 
-        // --- مدیریت نشست‌ها (User Sessions) ---
+        // --- User Sessions Management ---
         case 'get_sessions':
             $sessions = $auth->getUserSessions($userId);
-            sendJsonResponse(true, 'لیست نشست‌های فعال دریافت شد.', ['sessions' => $sessions]);
+            sendJsonResponse(true, 'Active sessions retrieved.', ['sessions' => $sessions]);
             break;
 
         case 'revoke_session':
@@ -229,10 +229,10 @@ try {
             sendJsonResponse($res['success'], $res['message'], [], $res['success'] ? 200 : 400);
             break;
 
-        // --- مدیریت فایل‌ها (Vault) ---
+        // --- File Management (Vault) ---
         case 'upload_file':
             if (!isset($_FILES['file'])) {
-                sendJsonResponse(false, 'فایلی ارسال نشده است.', [], 400);
+                sendJsonResponse(false, 'No file was sent.', [], 400);
             }
             $res = $vault->uploadFile($userId, $_FILES['file']);
             sendJsonResponse($res['success'], $res['message'], $res['success'] ? ['file_id' => $res['file_id']] : [], $res['success'] ? 200 : 400);
@@ -240,13 +240,13 @@ try {
 
         case 'list_files':
             $files = $vault->getUserFiles($userId);
-            sendJsonResponse(true, 'لیست فایل‌ها دریافت شد.', ['files' => $files]);
+            sendJsonResponse(true, 'Files retrieved.', ['files' => $files]);
             break;
 
         case 'download_file':
             $fileId = (int)($_GET['id'] ?? 0);
             if ($fileId <= 0) {
-                sendJsonResponse(false, 'شناسه فایل نامعتبر است.', [], 400);
+                sendJsonResponse(false, 'Invalid file ID.', [], 400);
             }
             $vault->downloadFile($userId, $fileId);
             exit;
@@ -257,7 +257,7 @@ try {
             sendJsonResponse($res['success'], $res['message'], [], $res['success'] ? 200 : 400);
             break;
 
-        // --- مدیریت یادداشت‌ها (Vault) ---
+        // --- Note Management (Vault) ---
         case 'create_note':
             $title   = trim($_POST['title'] ?? '');
             $content = $_POST['content'] ?? '';
@@ -267,13 +267,13 @@ try {
 
         case 'list_notes':
             $notes = $vault->getUserNotes($userId);
-            sendJsonResponse(true, 'لیست یادداشت‌ها دریافت شد.', ['notes' => $notes]);
+            sendJsonResponse(true, 'Notes retrieved.', ['notes' => $notes]);
             break;
 
         case 'get_note':
             $noteId = (int)($_GET['note_id'] ?? 0);
             $res = $vault->getNote($userId, $noteId);
-            sendJsonResponse($res['success'], $res['message'] ?? 'موفق', $res['success'] ? ['note' => $res['note']] : [], $res['success'] ? 200 : 404);
+            sendJsonResponse($res['success'], $res['message'] ?? 'Success', $res['success'] ? ['note' => $res['note']] : [], $res['success'] ? 200 : 404);
             break;
 
         case 'delete_note':
@@ -282,7 +282,7 @@ try {
             sendJsonResponse($res['success'], $res['message'], [], $res['success'] ? 200 : 400);
             break;
 
-        // --- ایجاد لینک اشتراک‌گذاری ---
+        // --- Create Share Link ---
         case 'create_share_link':
             $itemType    = $_POST['item_type'] ?? '';
             $itemId      = (int)($_POST['item_id'] ?? 0);
@@ -294,7 +294,7 @@ try {
             
             if ($res['success']) {
                 $downloadUrl = "download.php?token=" . $res['token'];
-                sendJsonResponse(true, 'لینک اشتراک‌گذاری با موفقیت ساخته شد.', [
+                sendJsonResponse(true, 'Share link created successfully.', [
                     'share_url'  => $downloadUrl,
                     'expires_at' => $res['expires_at'],
                     'max_uses'   => $res['max_uses']
@@ -305,10 +305,10 @@ try {
             break;
 
         default:
-            sendJsonResponse(false, 'اکشن درخواست‌شده معتبر نیست.', [], 404);
+            sendJsonResponse(false, 'Invalid action requested.', [], 404);
             break;
     }
 } catch (Exception $e) {
     error_log("API Error: " . $e->getMessage());
-    sendJsonResponse(false, 'خطایی در پردازش درخواست روی سرور رخ داده است.', [], 500);
+    sendJsonResponse(false, 'An error occurred while processing the request on the server.', [], 500);
 }

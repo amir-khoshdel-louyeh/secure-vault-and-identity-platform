@@ -15,20 +15,20 @@ class Vault {
     }
 
     // =========================================================================
-    // ۱. مدیریت پوشه‌ها (Folders)
+    // 1. Manage Folders
     // =========================================================================
 
     public function createFolder(int $userId, string $name, ?int $parentId = null): array {
         $name = trim($name);
         if (empty($name)) {
-            return ['success' => false, 'message' => 'نام پوشه نمی‌تواند خالی باشد.'];
+            return ['success' => false, 'message' => 'Folder name cannot be empty.'];
         }
 
         if ($parentId !== null) {
             $stmt = $this->db->prepare("SELECT id FROM folders WHERE id = ? AND user_id = ?");
             $stmt->execute([$parentId, $userId]);
             if (!$stmt->fetch()) {
-                return ['success' => false, 'message' => 'پوشه والد یافت نشد.'];
+                return ['success' => false, 'message' => 'Parent folder not found.'];
             }
         }
 
@@ -36,7 +36,7 @@ class Vault {
         $stmt->execute([$userId, $parentId, $name]);
 
         $this->logAction($userId, 'CREATE_FOLDER');
-        return ['success' => true, 'message' => 'پوشه با موفقیت ایجاد شد.', 'folder_id' => $this->db->lastInsertId()];
+        return ['success' => true, 'message' => 'Folder created successfully.', 'folder_id' => $this->db->lastInsertId()];
     }
 
     public function getUserFolders(int $userId): array {
@@ -50,20 +50,20 @@ class Vault {
         $stmt->execute([$folderId, $userId]);
 
         if ($stmt->rowCount() === 0) {
-            return ['success' => false, 'message' => 'پوشه یافت نشد یا دسترسی ندارید.'];
+            return ['success' => false, 'message' => 'Folder not found or you do not have permission.'];
         }
 
         $this->logAction($userId, 'DELETE_FOLDER');
-        return ['success' => true, 'message' => 'پوشه با موفقیت حذف شد.'];
+        return ['success' => true, 'message' => 'Folder deleted successfully.'];
     }
 
     // =========================================================================
-    // ۲. مدیریت یادداشت‌ها (Notes) - با پشتیبانی از Zero-Knowledge، تگ و پوشه
+    // 2. Manage Notes - With Zero-Knowledge, Tags, and Folders support
     // =========================================================================
 
     public function createNote(int $userId, string $title, string $content, ?int $folderId = null, ?string $tags = null, bool $isClientEncrypted = false, ?string $customIv = null, ?string $customTag = null): array {
         if (empty($title) || empty($content)) {
-            return ['success' => false, 'message' => 'عنوان و متن یادداشت نمی‌تواند خالی باشد.'];
+            return ['success' => false, 'message' => 'Note title and content cannot be empty.'];
         }
 
         $ciphertext = '';
@@ -71,12 +71,12 @@ class Vault {
         $tag = '';
 
         if ($isClientEncrypted) {
-            // معماری Zero-Knowledge: متن قبلاً در کلاینت رمزنگاری شده است
+            // Zero-Knowledge Architecture: Text is already encrypted on the client
             $ciphertext = $content;
             $iv = $customIv ?? '';
             $tag = $customTag ?? '';
         } else {
-            // رمزنگاری سمت سرور با AES-256-GCM
+            // Server-side encryption with AES-256-GCM
             $cryptoRes = Crypto::encryptText($content);
             $ciphertext = $cryptoRes['ciphertext'];
             $iv = $cryptoRes['iv'];
@@ -90,14 +90,14 @@ class Vault {
 
         $this->logAction($userId, 'CREATE_NOTE');
 
-        return ['success' => true, 'message' => 'یادداشت با موفقیت ذخیره شد.', 'note_id' => $this->db->lastInsertId()];
+        return ['success' => true, 'message' => 'Note saved successfully.', 'note_id' => $this->db->lastInsertId()];
     }
 
     public function updateNote(int $userId, int $noteId, string $title, string $content, ?int $folderId = null, ?string $tags = null, bool $isClientEncrypted = false, ?string $customIv = null, ?string $customTag = null): array {
         $stmt = $this->db->prepare("SELECT id FROM notes WHERE id = ? AND user_id = ? AND is_deleted = 0");
         $stmt->execute([$noteId, $userId]);
         if (!$stmt->fetch()) {
-            return ['success' => false, 'message' => 'یادداشت یافت نشد یا دسترسی ندارید.'];
+            return ['success' => false, 'message' => 'Note not found or you do not have permission.'];
         }
 
         if ($isClientEncrypted) {
@@ -117,7 +117,7 @@ class Vault {
         $stmt->execute([$title, $ciphertext, $iv, $tag, $folderId, $tags, $noteId, $userId]);
 
         $this->logAction($userId, 'UPDATE_NOTE');
-        return ['success' => true, 'message' => 'یادداشت با موفقیت به‌روزرسانی شد.'];
+        return ['success' => true, 'message' => 'Note updated successfully.'];
     }
 
     public function getNote(int $userId, int $noteId): array {
@@ -126,10 +126,10 @@ class Vault {
         $note = $stmt->fetch();
 
         if (!$note) {
-            return ['success' => false, 'message' => 'یادداشت یافت نشد یا شما دسترسی ندارید.'];
+            return ['success' => false, 'message' => 'Note not found or you do not have permission.'];
         }
 
-        // اگر IV موجود باشد متد سرور رمزگشایی می‌کند؛ در غیر این صورت جهت Zero-Knowledge متن خام رمزنگاری کلاینت برگردانده می‌شود
+        // Decrypt on server if IV is present; otherwise, return raw client-encrypted text for Zero-Knowledge
         $plainContent = !empty($note['iv']) 
             ? Crypto::decryptText($note['encrypted_content'], $note['iv'], $note['tag'] ?? '') 
             : $note['encrypted_content'];
@@ -171,23 +171,23 @@ class Vault {
     }
 
     // =========================================================================
-    // ۳. مدیریت فایل‌ها (Files) - با پشتیبانی از Zero-Knowledge و پوشه‌ها
+    // 3. Manage Files - With Zero-Knowledge and Folders support
     // =========================================================================
 
     public function uploadFile(int $userId, array $file, ?int $folderId = null, ?string $tags = null): array {
         if (!isset($file['error']) || $file['error'] !== UPLOAD_ERR_OK) {
-            return ['success' => false, 'message' => 'خطا در بارگذاری فایل.'];
+            return ['success' => false, 'message' => 'Error uploading file.'];
         }
 
-        if ($file['size'] > 50 * 1024 * 1024) { // حد مجاز ۵۰ مگابایت
-            return ['success' => false, 'message' => 'حجم فایل نباید بیشتر از ۵۰ مگابایت باشد.'];
+        if ($file['size'] > 50 * 1024 * 1024) { // 50MB limit
+            return ['success' => false, 'message' => 'File size cannot exceed 50 MB.'];
         }
 
         $originalName = basename($file['name']);
         $allowedExtensions = ['jpg', 'jpeg', 'png', 'pdf', 'docx', 'xlsx', 'txt', 'zip', 'rar'];
         $ext = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
         if (!in_array($ext, $allowedExtensions)) {
-            return ['success' => false, 'message' => 'فرمت فایل مجاز نیست.'];
+            return ['success' => false, 'message' => 'File format is not allowed.'];
         }
 
         $encryptedName = bin2hex(random_bytes(16)) . '.enc';
@@ -214,7 +214,7 @@ class Vault {
 
         $this->logAction($userId, 'UPLOAD_FILE');
 
-        return ['success' => true, 'message' => 'فایل با موفقیت و به صورت رمزنگاری‌شده آپلود شد.'];
+        return ['success' => true, 'message' => 'File uploaded and encrypted successfully.'];
     }
 
     public function updateItemMetadata(int $userId, string $type, int $itemId, string $newName, ?int $folderId = null, ?string $tags = null): array {
@@ -225,11 +225,11 @@ class Vault {
         $stmt->execute([$newName, $folderId, $tags, $itemId, $userId]);
 
         if ($stmt->rowCount() === 0) {
-            return ['success' => false, 'message' => 'آیتم مورد نظر یافت نشد.'];
+            return ['success' => false, 'message' => 'Item not found.'];
         }
 
         $this->logAction($userId, 'UPDATE_METADATA');
-        return ['success' => true, 'message' => 'اطلاعات با موفقیت بروزرسانی شد.'];
+        return ['success' => true, 'message' => 'Information updated successfully.'];
     }
 
     public function downloadFile(int $userId, int $fileId): void {
@@ -239,13 +239,13 @@ class Vault {
 
         if (!$file) {
             http_response_code(404);
-            die("فایل یافت نشد یا دسترسی ندارید.");
+            die("File not found or you do not have permission.");
         }
 
         $filePath = STORAGE_DIR . $file['encrypted_name'];
         if (!file_exists($filePath)) {
             http_response_code(404);
-            die("فایل روی سرور موجود نیست.");
+            die("File does not exist on the server.");
         }
 
         header('Content-Type: ' . $file['mime_type']);
@@ -279,7 +279,7 @@ class Vault {
     }
 
     // =========================================================================
-    // ۴. سطل زباله (Trash - 30 Days Retention)
+    // 4. Trash Bin - 30 Days Retention
     // =========================================================================
 
     public function moveToTrash(int $userId, string $type, int $itemId): array {
@@ -288,11 +288,11 @@ class Vault {
         $stmt->execute([$itemId, $userId]);
 
         if ($stmt->rowCount() === 0) {
-            return ['success' => false, 'message' => 'آیتم مورد نظر یافت نشد.'];
+            return ['success' => false, 'message' => 'Item not found.'];
         }
 
         $this->logAction($userId, 'MOVE_TO_TRASH');
-        return ['success' => true, 'message' => 'آیتم به سطل زباله منتقل شد.'];
+        return ['success' => true, 'message' => 'Item moved to trash.'];
     }
 
     public function restoreFromTrash(int $userId, string $type, int $itemId): array {
@@ -301,11 +301,11 @@ class Vault {
         $stmt->execute([$itemId, $userId]);
 
         if ($stmt->rowCount() === 0) {
-            return ['success' => false, 'message' => 'آیتم مورد نظر در سطل زباله یافت نشد.'];
+            return ['success' => false, 'message' => 'Item not found in trash.'];
         }
 
         $this->logAction($userId, 'RESTORE_FROM_TRASH');
-        return ['success' => true, 'message' => 'آیتم با موفقیت بازیابی شد.'];
+        return ['success' => true, 'message' => 'Item restored successfully.'];
     }
 
     public function getTrashItems(int $userId): array {
@@ -321,7 +321,7 @@ class Vault {
     }
 
     /**
-     * پاک‌سازی فیزیکی خودکار آیتم‌های قدیمی‌تر از ۳۰ روز در سطل زباله
+     * Automatic physical cleanup of items older than 30 days in the trash
      */
     public function purgeOldTrash(): void {
         $stmt = $this->db->prepare("SELECT id, encrypted_name FROM files WHERE is_deleted = 1 AND deleted_at < DATE_SUB(NOW(), INTERVAL 30 DAY)");
@@ -340,7 +340,7 @@ class Vault {
     }
 
     // =========================================================================
-    // ۵. لاگ‌های سیستم و امنیتی
+    // 5. System and Security Logs
     // =========================================================================
 
     public function getAuditLogs(int $userId, int $limit = 50): array {

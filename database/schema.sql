@@ -1,7 +1,7 @@
 CREATE DATABASE IF NOT EXISTS `secure_vault` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE `secure_vault`;
 
--- ۱. جدول کاربران (افزایش ستون کلید پشتیبان recovery_code_hash)
+-- 1. Users Table (Added backup key column: recovery_code_hash)
 CREATE TABLE IF NOT EXISTS `users` (
   `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   `username` VARCHAR(50) NOT NULL UNIQUE,
@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ۲. جدول پوشه‌ها (Folder Structure)
+-- 2. Folders Table
 CREATE TABLE IF NOT EXISTS `folders` (
   `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   `user_id` INT UNSIGNED NOT NULL,
@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS `folders` (
   FOREIGN KEY (`parent_id`) REFERENCES `folders`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ۳. جدول یادداشت‌ها (افزودن folder_id، تگ‌ها، سطل زباله و Zero-Knowledge)
+-- 3. Notes Table (Added folder_id, tags, trash bin, and Zero-Knowledge)
 CREATE TABLE IF NOT EXISTS `notes` (
   `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   `user_id` INT UNSIGNED NOT NULL,
@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS `notes` (
   FOREIGN KEY (`folder_id`) REFERENCES `folders`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ۴. جدول فایل‌ها (افزودن folder_id، تگ‌ها و سطل زباله)
+-- 4. Files Table (Added folder_id, tags, and trash bin)
 CREATE TABLE IF NOT EXISTS `files` (
   `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   `user_id` INT UNSIGNED NOT NULL,
@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS `files` (
   FOREIGN KEY (`folder_id`) REFERENCES `folders`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ۵. جدول لینک‌های اشتراک‌گذاری (پسورد، Self-Destruct و محدودیت دانلود)
+-- 5. Share Tokens Table (Password, Self-Destruct, and download limit)
 CREATE TABLE IF NOT EXISTS `share_tokens` (
   `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   `user_id` INT UNSIGNED NOT NULL,
@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS `share_tokens` (
   INDEX `idx_token` (`token`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ۶. جدول لاگ‌های امنیتی (Audit Logs)
+-- 6. Security Logs Table (Audit Logs)
 CREATE TABLE IF NOT EXISTS `audit_logs` (
   `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   `user_id` INT UNSIGNED DEFAULT NULL,
@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS `audit_logs` (
   FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ۷. جدول مدیریت نشست‌های فعال (Session Management)
+-- 7. Active Sessions Management Table
 CREATE TABLE IF NOT EXISTS `user_sessions` (
   `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   `session_id` VARCHAR(128) NOT NULL UNIQUE,
@@ -98,7 +98,7 @@ CREATE TABLE IF NOT EXISTS `user_sessions` (
   FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ۸. جدول محدودکننده نرخ درخواست (Rate Limiting برای جلوگیری از Brute-Force)
+-- 8. Rate Limiting Table (to prevent Brute-Force)
 CREATE TABLE IF NOT EXISTS `rate_limits` (
   `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   `ip_address` VARCHAR(45) NOT NULL,
