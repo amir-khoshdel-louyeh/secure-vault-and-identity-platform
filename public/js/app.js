@@ -201,9 +201,53 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================
     // 4. Auth & Initializer
     // ==========================================
+    function updateWelcomeUI(isLoggedIn, username) {
+        const guestCta = document.getElementById('welcome-cta-guest');
+        const loggedCta = document.getElementById('welcome-cta-loggedin');
+        const guestCtaBottom = document.getElementById('welcome-cta-bottom-guest');
+        const loggedCtaBottom = document.getElementById('welcome-cta-bottom-loggedin');
+        const headerGuest = document.getElementById('welcome-header-guest');
+        const headerLogged = document.getElementById('welcome-header-loggedin');
+        const welcomeName = document.getElementById('welcome-loggedin-name');
+        if (welcomeName && username) welcomeName.innerText = username;
+        if (isLoggedIn) {
+            if (guestCta) guestCta.style.display = 'none';
+            if (loggedCta) loggedCta.style.display = 'flex';
+            if (guestCtaBottom) guestCtaBottom.style.display = 'none';
+            if (loggedCtaBottom) loggedCtaBottom.style.display = 'flex';
+            if (headerGuest) headerGuest.style.display = 'none';
+            if (headerLogged) headerLogged.style.display = 'flex';
+        } else {
+            if (guestCta) guestCta.style.display = 'flex';
+            if (loggedCta) loggedCta.style.display = 'none';
+            if (guestCtaBottom) guestCtaBottom.style.display = 'flex';
+            if (loggedCtaBottom) loggedCtaBottom.style.display = 'none';
+            if (headerGuest) headerGuest.style.display = 'flex';
+            if (headerLogged) headerLogged.style.display = 'none';
+        }
+    }
+
     async function checkAuthStatus() {
         if (currentPage === 'share.html' && new URLSearchParams(window.location.search).has('token')) {
             initPublicShareView();
+            return;
+        }
+
+        // Welcome page: stay on landing and update CTA based on auth, no auto-redirect
+        if (currentPage === 'index.html') {
+            try {
+                const res = await apiRequest('get_user_info');
+                const isLogged = res && res.success;
+                csrfToken = isLogged ? (res.csrf_token || csrfToken) : csrfToken;
+                updateWelcomeUI(isLogged, isLogged ? (res.user?.username || res.username) : null);
+                // Also update meta csrf token if present
+                if (isLogged && res.csrf_token) {
+                    const meta = document.querySelector('meta[name="csrf-token"]');
+                    if (meta) meta.setAttribute('content', res.csrf_token);
+                }
+            } catch (e) {
+                updateWelcomeUI(false, null);
+            }
             return;
         }
 
@@ -217,7 +261,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 welcomeUserElem.innerText = `Welcome, ${res.user?.username || res.username}`;
             }
 
-            if (currentPage === 'login.html' || currentPage === 'index.html') {
+            if (currentPage === 'login.html') {
                 window.location.href = 'dashboard.html';
             }
 
@@ -430,6 +474,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (logoutBtn) {
         logoutBtn.addEventListener('click', async () => {
+            await apiRequest('logout', 'POST');
+            window.location.href = 'login.html';
+        });
+    }
+
+    const welcomeLogoutBtn = document.getElementById('welcome-logout-btn');
+    if (welcomeLogoutBtn) {
+        welcomeLogoutBtn.addEventListener('click', async () => {
             await apiRequest('logout', 'POST');
             window.location.href = 'login.html';
         });

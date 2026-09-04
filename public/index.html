@@ -1,13 +1,136 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" dir="ltr">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="refresh" content="0; url=login.html">
-    <title>Redirecting...</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="">
+    <title>Secure Vault & Identity Platform - Welcome</title>
+    <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-    <script>
-        window.location.href = "login.html";
-    </script>
+
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <h1>Secure Vault & Identity Platform</h1>
+            <div id="welcome-header-actions" style="display:flex;gap:10px;align-items:center;">
+                <!-- Guest header actions -->
+                <div id="welcome-header-guest" style="display:flex;gap:10px;align-items:center;">
+                    <a href="login.html" class="btn-primary" style="text-decoration:none;">Login</a>
+                    <a href="login.html" class="btn-secondary" style="text-decoration:none;">Create Account</a>
+                </div>
+                <!-- Logged-in header actions -->
+                <div id="welcome-header-loggedin" style="display:none;gap:10px;align-items:center;">
+                    <span id="welcome-loggedin-name" style="font-weight:600;color:var(--text-color);"></span>
+                    <a href="dashboard.html" class="btn-primary" style="text-decoration:none;">Go to Dashboard</a>
+                    <button id="welcome-logout-btn" class="btn-danger" type="button">Sign Out</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Hero Section -->
+        <section class="welcome-hero card">
+            <div class="welcome-hero-badge">Private &amp; Encrypted • Two-Factor Protected • You Stay in Control</div>
+            <h2>Your Data, Encrypted.<br>Your Identity, Secured.</h2>
+            <p class="welcome-hero-subtitle">
+                Keep your files and notes safe in a private vault where <strong>everything stays encrypted</strong>.
+                Protect your account with <strong>two-factor authentication</strong> and share anything securely
+                with links you control — simple, private, and always under your control.
+            </p>
+            <!-- Guest CTA -->
+            <div id="welcome-cta-guest" class="welcome-hero-actions">
+                <a href="login.html" class="btn-primary welcome-cta-main" style="text-decoration:none;padding:12px 24px;font-size:1rem;">Login to Your Vault</a>
+                <a href="login.html" class="btn-secondary welcome-cta-secondary" style="text-decoration:none;padding:12px 24px;font-size:1rem;">Create Account — It's Free</a>
+            </div>
+            <!-- Logged-in CTA -->
+            <div id="welcome-cta-loggedin" class="welcome-hero-actions" style="display:none;">
+                <a href="dashboard.html" class="btn-primary welcome-cta-main" style="text-decoration:none;padding:12px 24px;font-size:1rem;">Open Dashboard</a>
+                <a href="share.html" class="btn-secondary" style="text-decoration:none;padding:12px 24px;font-size:1rem;">Manage Shares</a>
+            </div>
+            <p class="welcome-hero-note">Open source • Single-entry JSON API • 8-table MySQL schema • Encrypted at rest</p>
+        </section>
+
+        <!-- Features Grid -->
+        <section class="welcome-section">
+            <h3 class="welcome-section-title">Why Secure Vault?</h3>
+            <p class="welcome-section-subtitle">Most apps encrypt only in transit. If the DB leaks, plaintext is exposed. This platform encrypts everything at rest and gives you full identity control.</p>
+            <div class="welcome-features-grid">
+                <div class="welcome-feature-card">
+                    <div class="welcome-feature-icon">🔐</div>
+                    <h4>AES-256-GCM Encryption</h4>
+                    <p>Every file and note is encrypted with random 12-byte IVs and 16-byte auth tags. Files stored as randomized .enc names; plaintext never persists on disk.</p>
+                </div>
+                <div class="welcome-feature-card">
+                    <div class="welcome-feature-icon">🛡️</div>
+                    <h4>Zero-Knowledge Mode</h4>
+                    <p>Optional client-side encryption via Web Crypto API (PBKDF2 100k + AES-GCM). The server stores only ciphertext — even the operator cannot read your notes.</p>
+                </div>
+                <div class="welcome-feature-card">
+                    <div class="welcome-feature-icon">📱</div>
+                    <h4>TOTP 2FA + Recovery</h4>
+                    <p>Two-step login (password → TOTP), QR provisioning for Google Authenticator / Authy, and bcrypt-hashed single-use recovery codes for device loss.</p>
+                </div>
+                <div class="welcome-feature-card">
+                    <div class="welcome-feature-icon">🔗</div>
+                    <h4>Secure Share Links</h4>
+                    <p>64-char hex tokens with expiry and usage limits. Revoke anytime in <em>Managed Links</em>. Shared notes render XSS-safe; ZK notes decrypt in the browser.</p>
+                </div>
+                <div class="welcome-feature-card">
+                    <div class="welcome-feature-icon">💻</div>
+                    <h4>Session &amp; Trash Control</h4>
+                    <p>Database-backed sessions with IP / user-agent tracking and revocation. Soft-delete with 30-day Trash Bin — restore or delete forever.</p>
+                </div>
+                <div class="welcome-feature-card">
+                    <div class="welcome-feature-icon">📋</div>
+                    <h4>Defense-in-Depth</h4>
+                    <p>Multiple layers of protection keep your vault safe — from login to storage — so your private data stays private without getting in your way.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- How it Works -->
+        <section class="welcome-how card">
+            <h3 class="welcome-section-title">How It Works</h3>
+            <div class="welcome-steps">
+                <div class="welcome-step">
+                    <div class="welcome-step-number">1</div>
+                    <h4>Create Account &amp; Secure It</h4>
+                    <p>Register with username / email / password (bcrypt cost 12). Optionally enable 2FA — scan QR, verify 6-digit code, save your recovery code.</p>
+                    <a href="login.html" class="btn-link welcome-step-link" style="text-decoration:none;">Go to Registration →</a>
+                </div>
+                <div class="welcome-step">
+                    <div class="welcome-step-number">2</div>
+                    <h4>Store Encrypted</h4>
+                    <p>Upload files (validated type/size) or create notes. Choose server AES-GCM or client-side zero-knowledge. Organize with folders &amp; tags.</p>
+                    <a href="login.html" class="btn-link welcome-step-link" style="text-decoration:none;">Login to Upload →</a>
+                </div>
+                <div class="welcome-step">
+                    <div class="welcome-step-number">3</div>
+                    <h4>Share Securely</h4>
+                    <p>Generate a share link: pick expiry (1h–7d) and max uses. Copy link, send it, and manage/revoke it later in <em>Dashboard → Managed Links</em>.</p>
+                    <a href="dashboard.html" class="btn-link welcome-step-link" style="text-decoration:none;">Open Managed Links →</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- Final CTA -->
+        <section class="welcome-cta card" style="text-align:center;">
+            <h3>Ready to secure your vault?</h3>
+            <p style="opacity:0.8;margin:8px 0 20px 0;">Join in seconds — enable 2FA later if you want. Your data stays encrypted at rest from day one.</p>
+            <div id="welcome-cta-bottom-guest" class="welcome-hero-actions" style="justify-content:center;">
+                <a href="login.html" class="btn-primary" style="text-decoration:none;padding:12px 24px;font-size:1rem;">Login</a>
+                <a href="login.html" class="btn-secondary" style="text-decoration:none;padding:12px 24px;font-size:1rem;">Create Account</a>
+            </div>
+            <div id="welcome-cta-bottom-loggedin" class="welcome-hero-actions" style="display:none;justify-content:center;">
+                <a href="dashboard.html" class="btn-primary" style="text-decoration:none;padding:12px 24px;font-size:1rem;">Go to Dashboard</a>
+            </div>
+        </section>
+
+        <footer class="welcome-footer">
+            <p>Secure Vault &amp; Identity Platform • Self-hosted • <a href="login.html">Login</a> • <a href="dashboard.html">Dashboard</a> • <a href="share.html">Shares</a></p>
+        </footer>
+    </div>
+
+    <script src="js/app.js"></script>
 </body>
 </html>
