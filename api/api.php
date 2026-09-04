@@ -308,6 +308,37 @@ try {
             sendJsonResponse($res['success'], $res['message'], [], $res['success'] ? 200 : 400);
             break;
 
+        // --- Manage Share Links ---
+        case 'list_share_links':
+        case 'list_shares':
+        case 'get_share_links':
+            $shareManager = new ShareManager();
+            $links = $shareManager->getUserShareTokens($userId);
+            sendJsonResponse(true, 'Share links retrieved.', ['links' => $links, 'shares' => $links]);
+            break;
+
+        case 'revoke_share_link':
+        case 'delete_share_link':
+        case 'remove_share_link':
+            $shareId = (int)($_POST['share_id'] ?? $_POST['id'] ?? $_POST['token_id'] ?? 0);
+            // Also allow revocation by token string
+            if ($shareId <= 0 && !empty($_POST['token'])) {
+                $tokenStr = trim($_POST['token']);
+                // Lookup id by token owned by user
+                $dbTmp = getDBConnection();
+                $stmtTmp = $dbTmp->prepare("SELECT id FROM share_tokens WHERE token = ? AND user_id = ?");
+                $stmtTmp->execute([$tokenStr, $userId]);
+                $rowTmp = $stmtTmp->fetch();
+                if ($rowTmp) $shareId = (int)$rowTmp['id'];
+            }
+            if ($shareId <= 0) {
+                sendJsonResponse(false, 'Invalid share link ID.', [], 400);
+            }
+            $shareManager = new ShareManager();
+            $res = $shareManager->revokeShareToken($userId, $shareId);
+            sendJsonResponse($res['success'], $res['message'], [], $res['success'] ? 200 : 400);
+            break;
+
         // --- Create Share Link ---
         case 'create_share_link':
             $itemType    = $_POST['item_type'] ?? '';
