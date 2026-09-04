@@ -301,10 +301,43 @@ input:focus, textarea:focus, select:focus {
     gap: 12px;
     margin-bottom: 20px;
     align-items: center;
+    flex-wrap: wrap;
+}
+
+.inline-form input,
+.inline-form select,
+.inline-form textarea {
+    min-width: 0;
 }
 
 .inline-form input[type="file"] {
-    flex: 1;
+    flex: 0 1 240px;
+    width: auto;
+    min-width: 160px;
+    max-width: 280px;
+}
+
+.inline-form input[type="text"],
+.inline-form input[type="number"],
+.inline-form select {
+    flex: 1 1 180px;
+    width: auto;
+    min-width: 140px;
+    max-width: 360px;
+}
+
+.inline-form button,
+.inline-form .btn-primary,
+.inline-form .btn-secondary,
+.inline-form .btn-danger {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+/* Specific fix: upload file form tags input should not dominate the row */
+#upload-file-form input[name="tags"] {
+    flex: 1 1 180px;
+    max-width: 280px;
 }
 
 /* Tables */
@@ -453,6 +486,16 @@ tr:hover {
     .inline-form {
         flex-direction: column;
         align-items: stretch;
+    }
+
+    .inline-form input[type="file"],
+    .inline-form input[type="text"],
+    .inline-form input[type="number"],
+    .inline-form select,
+    #upload-file-form input[name="tags"] {
+        flex: 1 1 auto;
+        width: 100%;
+        max-width: none;
     }
 
     .tabs-nav {
