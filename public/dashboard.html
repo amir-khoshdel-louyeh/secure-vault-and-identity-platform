@@ -24,6 +24,7 @@
             <button class="nav-tab active" data-tab="vault-tab">Vault Storage</button>
             <button class="nav-tab" data-tab="security-tab">Security & 2FA</button>
             <button class="nav-tab" data-tab="sessions-tab">Active Sessions</button>
+            <button class="nav-tab" data-tab="links-tab">Managed Links</button>
             <button class="nav-tab" data-tab="trash-tab">Trash Bin</button>
         </nav>
 
@@ -131,7 +132,37 @@
                 </div>
             </div>
 
-            <!-- TAB 4: TRASH BIN -->
+            <!-- TAB 4: MANAGED LINKS -->
+            <div id="links-tab" class="tab-content" style="display: none;">
+                <div class="card">
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+                        <h3 style="margin:0;">Managed Links (Share Tokens)</h3>
+                        <button id="refresh-links-btn" class="btn-secondary" title="Reload share links">Refresh</button>
+                    </div>
+                    <p style="opacity:0.7; margin:8px 0 12px 0; font-size:0.9em;">View, copy, and revoke your active share links. Expired or exhausted links are marked accordingly.</p>
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Type</th>
+                                    <th>Item Name</th>
+                                    <th>Share Link</th>
+                                    <th>Created At</th>
+                                    <th>Expires At</th>
+                                    <th>Uses</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="links-list">
+                                <!-- Share links populated dynamically by app.js -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 5: TRASH BIN -->
             <div id="trash-tab" class="tab-content" style="display: none;">
                 <div class="card">
                     <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
