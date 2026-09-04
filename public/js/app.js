@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const notesList = document.getElementById('notes-list');
     const sessionsList = document.getElementById('sessions-list');
     const trashList = document.getElementById('trash-list');
+    const linksList = document.getElementById('links-list');
 
     // ==========================================
     // 1. Web Crypto API Helpers (Zero-Knowledge AES-256-GCM)
@@ -192,6 +193,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (target === 'sessions-tab') loadSessions();
             if (target === 'security-tab') check2FAStatus();
+            if (target === 'links-tab') loadLinks();
             if (target === 'trash-tab') loadTrash();
         });
     });
@@ -652,6 +654,74 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ==========================================
+    // 10b. Managed Links Management
+    // ==========================================
+    async function loadLinks() {
+        if (!linksList) return;
+        const res = await apiRequest('list_share_links');
+        if (!res || !res.success) {
+            linksList.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#c00;">Failed to load share links.</td></tr>';
+            return;
+        }
+
+        linksList.innerHTML = '';
+        const links = res.links || res.shares || [];
+        if (links.length === 0) {
+            linksList.innerHTML = '<tr><td colspan="8" style="text-align:center;opacity:0.6;">No share links created yet — use Share on a file or note to create one.</td></tr>';
+            return;
+        }
+
+        const basePath = window.location.pathname.includes('/public/') ? window.location.origin + '/public' : window.location.origin;
+        links.forEach(link => {
+            const fullUrl = `${basePath}/share.html?token=${link.token}`;
+            const downloadUrl = `${basePath}/download.php?token=${link.token}`;
+            const status = link.status || 'active';
+            let statusBadge = '';
+            if (status === 'active') {
+                statusBadge = '<span style="background:#d4edda;color:#155724;padding:2px 8px;border-radius:10px;font-size:0.8em;white-space:nowrap;">Active</span>';
+            } else if (status === 'expired') {
+                statusBadge = '<span style="background:#f8d7da;color:#721c24;padding:2px 8px;border-radius:10px;font-size:0.8em;white-space:nowrap;">Expired</span>';
+            } else if (status === 'exhausted') {
+                statusBadge = '<span style="background:#fff3cd;color:#856404;padding:2px 8px;border-radius:10px;font-size:0.8em;white-space:nowrap;">Exhausted</span>';
+            } else {
+                statusBadge = `<span style="background:#e2e3e5;color:#383d41;padding:2px 8px;border-radius:10px;font-size:0.8em;white-space:nowrap;">${escapeHtml(status)}</span>`;
+            }
+
+            const usesText = link.max_uses > 0 ? `${link.uses_count} / ${link.max_uses}` : `${link.uses_count} / ∞`;
+            const remainingText = link.remaining_uses >= 0 ? link.remaining_uses : '∞';
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><span style="text-transform:capitalize;">${escapeHtml(link.item_type)}</span></td>
+                <td title="${escapeHtml(link.item_name)}">${escapeHtml(link.item_name)}</td>
+                <td>
+                    <div style="display:flex;gap:6px;align-items:center;max-width:280px;">
+                        <input type="text" value="${escapeHtml(fullUrl)}" readonly style="flex:1;min-width:0;padding:4px 6px;font-size:0.82em;border:1px solid #ccc;border-radius:4px;">
+                        <button class="btn-copy-link btn-secondary" data-url="${escapeHtml(fullUrl)}" style="padding:4px 8px;white-space:nowrap;font-size:0.82em;">Copy</button>
+                    </div>
+                    <div style="margin-top:4px;">
+                        <a href="${escapeHtml(downloadUrl)}" target="_blank" style="font-size:0.78em;opacity:0.8;">Direct download</a>
+                        <span style="font-size:0.75em;opacity:0.5;margin-left:6px;" title="Token">${escapeHtml(link.token.substring(0, 12))}…</span>
+                    </div>
+                </td>
+                <td style="font-size:0.85em;white-space:nowrap;">${escapeHtml(link.created_at)}</td>
+                <td style="font-size:0.85em;white-space:nowrap;">${escapeHtml(link.expires_at)}</td>
+                <td style="text-align:center;white-space:nowrap;" title="Remaining: ${remainingText}">${escapeHtml(usesText)}</td>
+                <td>${statusBadge}</td>
+                <td style="white-space:nowrap;">
+                    <button class="btn-revoke-link btn-danger" data-id="${link.id}" title="Revoke and delete this share link" style="padding:4px 8px;">Revoke</button>
+                </td>
+            `;
+            linksList.appendChild(tr);
+        });
+    }
+
+    const refreshLinksBtn = document.getElementById('refresh-links-btn');
+    if (refreshLinksBtn) {
+        refreshLinksBtn.addEventListener('click', loadLinks);
+    }
+
+    // ==========================================
     // 11. Global Delegated Click Actions
     // ==========================================
     document.addEventListener('click', async (e) => {
@@ -736,6 +806,38 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
+        // Copy Managed Link URL
+        if (e.target.classList.contains('btn-copy-link')) {
+            const url = e.target.dataset.url;
+            if (url) {
+                try {
+                    await navigator.clipboard.writeText(url);
+                    const orig = e.target.innerText;
+                    e.target.innerText = 'Copied!';
+                    setTimeout(() => e.target.innerText = orig, 1500);
+                } catch {
+                    const input = e.target.previousElementSibling;
+                    if (input) {
+                        input.select();
+                        document.execCommand('copy');
+                        alert('Link copied to clipboard!');
+                    }
+                }
+            }
+        }
+
+        // Revoke Managed Link
+        if (e.target.classList.contains('btn-revoke-link')) {
+            if (confirm('Revoke this share link? Anyone with the link will no longer be able to access the item.')) {
+                const res = await apiRequest('revoke_share_link', 'POST', { share_id: e.target.dataset.id });
+                if (res && res.success) {
+                    loadLinks();
+                } else {
+                    alert(res?.message || 'Failed to revoke link.');
+                }
+            }
+        }
+
         // Open Share Modal
         if (e.target.classList.contains('btn-share-item')) {
             const type = e.target.dataset.type;
@@ -801,6 +903,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         navigator.clipboard.writeText(fullUrl);
                         alert('Share URL copied to clipboard!');
                     };
+                }
+                // Refresh managed links if on dashboard
+                if (typeof loadLinks === 'function') {
+                    try { loadLinks(); } catch {}
                 }
             } else {
                 alert(res?.message || 'Failed to generate share link.');
