@@ -344,6 +344,19 @@ try {
             sendJsonResponse($res['success'], $res['message'], [], $res['success'] ? 200 : 400);
             break;
 
+        case 'permanent_delete':
+        case 'delete_forever':
+            $type = $_POST['type'] ?? '';
+            $itemId = (int)($_POST['item_id'] ?? 0);
+            $res = $vault->permanentlyDelete($userId, $type, $itemId);
+            sendJsonResponse($res['success'], $res['message'], [], $res['success'] ? 200 : 400);
+            break;
+
+        case 'empty_trash':
+            $res = $vault->emptyTrash($userId);
+            sendJsonResponse($res['success'], $res['message'], [], $res['success'] ? 200 : 400);
+            break;
+
         // --- Audit Logs ---
         case 'get_audit_logs':
             $logs = $vault->getAuditLogs($userId);

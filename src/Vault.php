@@ -340,6 +340,83 @@ class Vault {
         return array_merge($notes, $files);
     }
 
+    public function permanentlyDelete(int $userId, string $type, int $itemId): array {
+        if (!in_array($type, ['file', 'note'], true)) {
+            return ['success' => false, 'message' => 'Invalid item type.'];
+        }
+        if ($itemId <= 0) {
+            return ['success' => false, 'message' => 'Invalid item ID.'];
+        }
+
+        $table = ($type === 'file') ? 'files' : 'notes';
+
+        // Ensure item exists in trash and belongs to user
+        $stmt = $this->db->prepare("SELECT id, encrypted_name FROM files WHERE id = ? AND user_id = ? AND is_deleted = 1");
+        $fileRow = null;
+        if ($type === 'file') {
+            $stmt->execute([$itemId, $userId]);
+            $fileRow = $stmt->fetch();
+            if (!$fileRow) {
+                return ['success' => false, 'message' => 'File not found in trash or you do not have permission.'];
+            }
+        } else {
+            $stmt2 = $this->db->prepare("SELECT id FROM notes WHERE id = ? AND user_id = ? AND is_deleted = 1");
+            $stmt2->execute([$itemId, $userId]);
+            if (!$stmt2->fetch()) {
+                return ['success' => false, 'message' => 'Note not found in trash or you do not have permission.'];
+            }
+        }
+
+        // Clean up share tokens for this item
+        $this->db->prepare("DELETE FROM share_tokens WHERE item_type = ? AND item_id = ? AND user_id = ?")->execute([$type, $itemId, $userId]);
+
+        if ($type === 'file' && !empty($fileRow['encrypted_name'])) {
+            $filePath = STORAGE_DIR . $fileRow['encrypted_name'];
+            if (file_exists($filePath)) {
+                @unlink($filePath);
+            }
+        }
+
+        $delStmt = $this->db->prepare("DELETE FROM {$table} WHERE id = ? AND user_id = ? AND is_deleted = 1");
+        $delStmt->execute([$itemId, $userId]);
+
+        if ($delStmt->rowCount() === 0) {
+            return ['success' => false, 'message' => 'Failed to permanently delete item.'];
+        }
+
+        $this->logAction($userId, 'PERMANENT_DELETE_' . strtoupper($type));
+        return ['success' => true, 'message' => ucfirst($type) . ' permanently deleted.'];
+    }
+
+    public function emptyTrash(int $userId): array {
+        // Delete all files physically first
+        $stmt = $this->db->prepare("SELECT id, encrypted_name FROM files WHERE user_id = ? AND is_deleted = 1");
+        $stmt->execute([$userId]);
+        $files = $stmt->fetchAll();
+        foreach ($files as $file) {
+            $this->db->prepare("DELETE FROM share_tokens WHERE item_type = 'file' AND item_id = ? AND user_id = ?")->execute([$file['id'], $userId]);
+            if (!empty($file['encrypted_name'])) {
+                $filePath = STORAGE_DIR . $file['encrypted_name'];
+                if (file_exists($filePath)) {
+                    @unlink($filePath);
+                }
+            }
+        }
+
+        // Clean share tokens for notes
+        $notesStmt = $this->db->prepare("SELECT id FROM notes WHERE user_id = ? AND is_deleted = 1");
+        $notesStmt->execute([$userId]);
+        foreach ($notesStmt->fetchAll() as $note) {
+            $this->db->prepare("DELETE FROM share_tokens WHERE item_type = 'note' AND item_id = ? AND user_id = ?")->execute([$note['id'], $userId]);
+        }
+
+        $this->db->prepare("DELETE FROM files WHERE user_id = ? AND is_deleted = 1")->execute([$userId]);
+        $this->db->prepare("DELETE FROM notes WHERE user_id = ? AND is_deleted = 1")->execute([$userId]);
+
+        $this->logAction($userId, 'EMPTY_TRASH');
+        return ['success' => true, 'message' => 'Trash emptied permanently.'];
+    }
+
     /**
      * Automatic physical cleanup of items older than 30 days in the trash
      */
