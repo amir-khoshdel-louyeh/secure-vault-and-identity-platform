@@ -134,7 +134,10 @@
             <!-- TAB 4: TRASH BIN -->
             <div id="trash-tab" class="tab-content" style="display: none;">
                 <div class="card">
-                    <h3>Trash Bin (Auto-purged after 30 days)</h3>
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+                        <h3 style="margin:0;">Trash Bin (Auto-purged after 30 days)</h3>
+                        <button id="empty-trash-btn" class="btn-danger" title="Permanently delete all items in trash">Empty Trash (Delete Forever)</button>
+                    </div>
                     <div class="table-responsive">
                         <table>
                             <thead>

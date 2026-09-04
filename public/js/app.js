@@ -632,6 +632,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!res || !res.success) return;
 
         trashList.innerHTML = '';
+        if (res.trash.length === 0) {
+            trashList.innerHTML = '<tr><td colspan="4" style="text-align:center;opacity:0.6;">Trash is empty</td></tr>';
+            return;
+        }
         res.trash.forEach(item => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
@@ -640,6 +644,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>${item.deleted_at}</td>
                 <td>
                     <button class="btn-restore-item btn-primary" data-type="${item.type}" data-id="${item.id}">Restore</button>
+                    <button class="btn-permanent-delete btn-danger" data-type="${item.type}" data-id="${item.id}" title="Delete forever - cannot be undone">Delete Forever</button>
                 </td>
             `;
             trashList.appendChild(tr);
@@ -673,6 +678,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 item_id: e.target.dataset.id
             });
             if (res && res.success) loadTrash();
+            else alert(res?.message || 'Restore failed.');
+        }
+
+        // Permanent Delete (Delete Forever) from Trash
+        if (e.target.classList.contains('btn-permanent-delete')) {
+            if (confirm('Permanently delete this item? This cannot be undone and the encrypted file (if any) will be removed from storage.')) {
+                const res = await apiRequest('permanent_delete', 'POST', {
+                    type: e.target.dataset.type,
+                    item_id: e.target.dataset.id
+                });
+                if (res && res.success) {
+                    loadTrash();
+                    loadFiles();
+                    loadNotes();
+                } else {
+                    alert(res?.message || 'Permanent delete failed.');
+                }
+            }
         }
 
         // Revoke Session
@@ -729,6 +752,22 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
+
+    const emptyTrashBtn = document.getElementById('empty-trash-btn');
+    if (emptyTrashBtn) {
+        emptyTrashBtn.addEventListener('click', async () => {
+            if (confirm('Empty entire trash? All items will be permanently deleted and cannot be recovered.')) {
+                const res = await apiRequest('empty_trash', 'POST');
+                if (res && res.success) {
+                    loadTrash();
+                    loadFiles();
+                    loadNotes();
+                } else {
+                    alert(res?.message || 'Empty trash failed.');
+                }
+            }
+        });
+    }
 
     // Close Modal Button
     const closeModalBtn = document.getElementById('close-modal-btn');
