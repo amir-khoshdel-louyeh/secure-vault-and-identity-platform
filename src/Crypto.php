@@ -2,7 +2,9 @@
 require_once dirname(__DIR__) . '/config/config.php';
 
 class Crypto {
-    private static string $algo = 'aes-256-gcm';
+    private static function getAlgo(): string {
+        return defined('ENCRYPTION_CIPHER') ? ENCRYPTION_CIPHER : 'aes-256-gcm';
+    }
 
     /**
      * Get 32-byte raw key from the Hex key defined in config
@@ -24,13 +26,14 @@ class Crypto {
      * @return array Contains ciphertext (base64), iv (base64) and tag (base64)
      */
     public static function encryptText(string $plainText): array {
-        $ivLength = openssl_cipher_iv_length(self::$algo);
+        $algo = self::getAlgo();
+        $ivLength = openssl_cipher_iv_length($algo);
         $iv = random_bytes($ivLength);
         $tag = '';
 
         $cipherText = openssl_encrypt(
             $plainText,
-            self::$algo,
+            $algo,
             self::getRawKey(),
             OPENSSL_RAW_DATA,
             $iv,
@@ -58,7 +61,7 @@ class Crypto {
 
         $plainText = openssl_decrypt(
             $cipherText,
-            self::$algo,
+            self::getAlgo(),
             self::getRawKey(),
             OPENSSL_RAW_DATA,
             $iv,
@@ -86,13 +89,14 @@ class Crypto {
             throw new Exception("Unable to read the source file.");
         }
 
-        $ivLength = openssl_cipher_iv_length(self::$algo);
+        $algo = self::getAlgo();
+        $ivLength = openssl_cipher_iv_length($algo);
         $iv = random_bytes($ivLength);
         $tag = '';
 
         $encryptedData = openssl_encrypt(
             $plainData,
-            self::$algo,
+            $algo,
             self::getRawKey(),
             OPENSSL_RAW_DATA,
             $iv,
@@ -127,7 +131,7 @@ class Crypto {
 
         $decryptedData = openssl_decrypt(
             $encryptedData,
-            self::$algo,
+            self::getAlgo(),
             self::getRawKey(),
             OPENSSL_RAW_DATA,
             $iv,

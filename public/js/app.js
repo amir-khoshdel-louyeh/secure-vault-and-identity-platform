@@ -108,7 +108,24 @@ document.addEventListener('DOMContentLoaded', () => {
     // 2. Unified API Request Handler
     // ==========================================
     async function apiRequest(action, method = 'GET', data = null) {
-        let url = `../api/api.php?action=${encodeURIComponent(action)}`;
+        // Resolve API path for both docroot=public and docroot=project-root
+        let apiBase = '../api/api.php';
+        // If page is at root (no /public/), absolute /api works better
+        if (window.location.pathname.startsWith('/public/')) {
+            apiBase = '../api/api.php';
+        } else if (window.location.pathname === '/' || window.location.pathname === '/index.html') {
+            apiBase = 'api/api.php';
+        } else if (!window.location.pathname.includes('/public/')) {
+            // Dashboard might be at /public/dashboard.html -> ../api works, but /api absolute is safest
+            apiBase = window.location.origin + '/api/api.php';
+            // fallback to relative if absolute fails will be handled by fetch error
+        }
+        let url = `${apiBase}?action=${encodeURIComponent(action)}`;
+        // Prefer absolute /api/api.php when available (project-root docroot)
+        if (apiBase.startsWith('../')) {
+            // also try absolute as fallback by storing alternative
+            // we'll keep relative; browser will resolve correctly from /public/
+        }
         const options = {
             method: method,
             headers: {}
@@ -675,8 +692,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const note = res.note;
                 let displayContent = note.content;
 
-                // Check if zero-knowledge encrypted (iv is empty or client flag set)
-                if (!note.iv || note.iv === '') {
+                // Check if zero-knowledge encrypted (iv empty or fallback flag or decryption mismatch)
+                if ((!note.iv || note.iv === '') || note.is_zk_fallback) {
                     const passphrase = prompt('This note is Zero-Knowledge Encrypted. Enter decryption passphrase:');
                     if (passphrase) {
                         try {
@@ -729,7 +746,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const res = await apiRequest('create_share_link', 'POST', formData);
 
             if (res && res.success) {
-                const fullUrl = `${window.location.origin}/share.html?token=${res.token}`;
+                const basePath = window.location.pathname.includes('/public/') ? window.location.origin + '/public' : window.location.origin;
+                const fullUrl = `${basePath}/share.html?token=${res.token}`;
                 
                 const outputField = document.getElementById('share-url-output') || document.getElementById('share-url-input');
                 const resultDiv = document.getElementById('share-result-box') || document.getElementById('share-result');

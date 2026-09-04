@@ -147,9 +147,16 @@ class Auth {
     // =========================================================================
 
     public function recoverAccount(string $identity, string $recoveryCode, string $newPassword): array {
-        $stmt = $this->db->prepare("SELECT * FROM users WHERE username = ? OR email = ?");
-        $stmt->execute([$identity, $identity]);
-        $user = $stmt->fetch();
+        // Allow recovery via pending 2FA session if identity not provided (frontend fallback)
+        if (empty($identity) && isset($_SESSION['2fa_pending_user_id'])) {
+            $stmtTmp = $this->db->prepare("SELECT * FROM users WHERE id = ?");
+            $stmtTmp->execute([$_SESSION['2fa_pending_user_id']]);
+            $user = $stmtTmp->fetch();
+        } else {
+            $stmt = $this->db->prepare("SELECT * FROM users WHERE username = ? OR email = ?");
+            $stmt->execute([$identity, $identity]);
+            $user = $stmt->fetch();
+        }
 
         if (!$user || empty($user['recovery_code_hash'])) {
             return ['success' => false, 'message' => 'Invalid information provided.'];
@@ -160,19 +167,30 @@ class Auth {
             return ['success' => false, 'message' => 'Incorrect recovery code.'];
         }
 
-        if (strlen($newPassword) < 8) {
-            return ['success' => false, 'message' => 'New password must be at least 8 characters long.'];
-        }
-
-        $newPasswordHash = password_hash($newPassword, PASSWORD_BCRYPT, ['cost' => 12]);
         $newRawRecoveryCode = strtoupper(bin2hex(random_bytes(4)) . '-' . bin2hex(random_bytes(4)));
         $newRecoveryHash = password_hash($newRawRecoveryCode, PASSWORD_BCRYPT);
 
-        // Reset 2FA and password
-        $stmt = $this->db->prepare(
-            "UPDATE users SET password_hash = ?, is_2fa_enabled = 0, recovery_code_hash = ? WHERE id = ?"
-        );
-        $stmt->execute([$newPasswordHash, $newRecoveryHash, $user['id']]);
+        if (!empty($newPassword)) {
+            if (strlen($newPassword) < 8) {
+                return ['success' => false, 'message' => 'New password must be at least 8 characters long.'];
+            }
+            $newPasswordHash = password_hash($newPassword, PASSWORD_BCRYPT, ['cost' => 12]);
+            $stmt = $this->db->prepare(
+                "UPDATE users SET password_hash = ?, is_2fa_enabled = 0, twofa_secret = NULL, recovery_code_hash = ? WHERE id = ?"
+            );
+            $stmt->execute([$newPasswordHash, $newRecoveryHash, $user['id']]);
+        } else {
+            // No new password supplied – keep existing password, just disable 2FA and rotate recovery code
+            $stmt = $this->db->prepare(
+                "UPDATE users SET is_2fa_enabled = 0, twofa_secret = NULL, recovery_code_hash = ? WHERE id = ?"
+            );
+            $stmt->execute([$newRecoveryHash, $user['id']]);
+            // Complete login immediately after recovery if pending
+            if (isset($_SESSION['2fa_pending_user_id'])) {
+                unset($_SESSION['2fa_pending_user_id']);
+                $this->completeLogin($user);
+            }
+        }
 
         $this->logAction($user['id'], 'ACCOUNT_RECOVERED');
 

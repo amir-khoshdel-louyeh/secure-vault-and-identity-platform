@@ -146,6 +146,21 @@ if ($action === 'recover_account') {
     }
 }
 
+// Public share access (no login required) – JSON info for share.html?token=
+if ($action === 'access_shared_item') {
+    $token = trim($_GET['token'] ?? $_POST['token'] ?? '');
+    if (empty($token) || !preg_match('/^[a-f0-9]{64}$/i', $token)) {
+        sendJsonResponse(false, 'Invalid share token.', [], 400);
+    }
+    $shareManager = new ShareManager();
+    $info = $shareManager->getShareInfo($token);
+    if ($info['success']) {
+        sendJsonResponse(true, 'Share retrieved.', $info);
+    } else {
+        sendJsonResponse(false, $info['message'], [], 404);
+    }
+}
+
 // ==========================================
 // 4. Check Authentication for other routes
 // ==========================================
@@ -191,6 +206,7 @@ try {
             sendJsonResponse(true, 'Information retrieved successfully.', [
                 'user_id'    => $userId,
                 'username'   => $_SESSION['username'] ?? '',
+                'user'       => ['username' => $_SESSION['username'] ?? ''],
                 'csrf_token' => $_SESSION['csrf_token']
             ]);
             break;
@@ -203,6 +219,9 @@ try {
 
         case 'setup_2fa':
             $setup = $auth->generate2FASetup($userId);
+            // Provide backward-compatible keys for app.js
+            $setup['qr_code_url'] = $setup['qr_code'] ?? null;
+            $setup['otpauth_url'] = $setup['qr_code'] ?? null;
             sendJsonResponse(true, '2FA information generated.', $setup);
             break;
 
@@ -224,7 +243,7 @@ try {
             break;
 
         case 'revoke_session':
-            $sessionId = (int)($_POST['session_db_id'] ?? 0);
+            $sessionId = (int)($_POST['session_db_id'] ?? $_POST['session_id'] ?? 0);
             $res = $auth->revokeSession($userId, $sessionId);
             sendJsonResponse($res['success'], $res['message'], [], $res['success'] ? 200 : 400);
             break;
@@ -234,8 +253,10 @@ try {
             if (!isset($_FILES['file'])) {
                 sendJsonResponse(false, 'No file was sent.', [], 400);
             }
-            $res = $vault->uploadFile($userId, $_FILES['file']);
-            sendJsonResponse($res['success'], $res['message'], $res['success'] ? ['file_id' => $res['file_id']] : [], $res['success'] ? 200 : 400);
+            $tags = $_POST['tags'] ?? null;
+            $folderId = isset($_POST['folder_id']) && $_POST['folder_id'] !== '' ? (int)$_POST['folder_id'] : null;
+            $res = $vault->uploadFile($userId, $_FILES['file'], $folderId, $tags);
+            sendJsonResponse($res['success'], $res['message'], $res['success'] ? ['file_id' => $res['file_id'] ?? null] : [], $res['success'] ? 200 : 400);
             break;
 
         case 'list_files':
@@ -261,7 +282,12 @@ try {
         case 'create_note':
             $title   = trim($_POST['title'] ?? '');
             $content = $_POST['content'] ?? '';
-            $res = $vault->createNote($userId, $title, $content);
+            $tags = $_POST['tags'] ?? null;
+            $folderId = isset($_POST['folder_id']) && $_POST['folder_id'] !== '' ? (int)$_POST['folder_id'] : null;
+            $isClientEncrypted = !empty($_POST['is_client_encrypted']) && $_POST['is_client_encrypted'] !== '0';
+            $customIv = $_POST['custom_iv'] ?? null;
+            $customTag = $_POST['custom_tag'] ?? null;
+            $res = $vault->createNote($userId, $title, $content, $folderId, $tags, $isClientEncrypted, $customIv, $customTag);
             sendJsonResponse($res['success'], $res['message'], $res['success'] ? ['note_id' => $res['note_id']] : [], $res['success'] ? 200 : 400);
             break;
 
@@ -295,6 +321,7 @@ try {
             if ($res['success']) {
                 $downloadUrl = "download.php?token=" . $res['token'];
                 sendJsonResponse(true, 'Share link created successfully.', [
+                    'token'      => $res['token'],
                     'share_url'  => $downloadUrl,
                     'expires_at' => $res['expires_at'],
                     'max_uses'   => $res['max_uses']
@@ -302,6 +329,38 @@ try {
             } else {
                 sendJsonResponse(false, $res['message'], [], 400);
             }
+            break;
+
+        // --- Trash Bin ---
+        case 'list_trash':
+            $trash = $vault->getTrashItems($userId);
+            sendJsonResponse(true, 'Trash retrieved.', ['trash' => $trash]);
+            break;
+
+        case 'restore_trash':
+            $type = $_POST['type'] ?? '';
+            $itemId = (int)($_POST['item_id'] ?? 0);
+            $res = $vault->restoreFromTrash($userId, $type, $itemId);
+            sendJsonResponse($res['success'], $res['message'], [], $res['success'] ? 200 : 400);
+            break;
+
+        // --- Audit Logs ---
+        case 'get_audit_logs':
+            $logs = $vault->getAuditLogs($userId);
+            sendJsonResponse(true, 'Audit logs retrieved.', ['logs' => $logs]);
+            break;
+
+        // --- Folders (basic) ---
+        case 'create_folder':
+            $name = trim($_POST['name'] ?? '');
+            $parentId = isset($_POST['parent_id']) && $_POST['parent_id'] !== '' ? (int)$_POST['parent_id'] : null;
+            $res = $vault->createFolder($userId, $name, $parentId);
+            sendJsonResponse($res['success'], $res['message'], $res['success'] ? ['folder_id' => $res['folder_id']] : [], $res['success'] ? 200 : 400);
+            break;
+
+        case 'list_folders':
+            $folders = $vault->getUserFolders($userId);
+            sendJsonResponse(true, 'Folders retrieved.', ['folders' => $folders]);
             break;
 
         default:

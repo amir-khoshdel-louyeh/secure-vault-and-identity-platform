@@ -34,10 +34,10 @@ class ShareManager {
 
         // 4. Save to database
         $stmt = $this->db->prepare(
-            "INSERT INTO share_tokens (item_type, item_id, token, expires_at, max_uses) 
-             VALUES (?, ?, ?, ?, ?)"
+            "INSERT INTO share_tokens (user_id, item_type, item_id, token, expires_at, max_uses) 
+             VALUES (?, ?, ?, ?, ?, ?)"
         );
-        $stmt->execute([$itemType, $itemId, $token, $expiresAt, $maxUses]);
+        $stmt->execute([$userId, $itemType, $itemId, $token, $expiresAt, $maxUses]);
 
         $this->logAction($userId, 'CREATE_SHARE_TOKEN');
 
@@ -122,7 +122,28 @@ class ShareManager {
             die("Note not found.");
         }
 
-        $plainText = Crypto::decryptText($note['encrypted_content'], $note['iv'], $note['tag'] ?? '');
+        // Try server decrypt; if fails, treat as Zero-Knowledge
+        $isZk = false;
+        $plainText = '';
+        try {
+            if (!empty($note['iv'])) {
+                $plainText = Crypto::decryptText($note['encrypted_content'], $note['iv'], $note['tag'] ?? '');
+            } else {
+                $isZk = true;
+            }
+        } catch (Exception $e) {
+            $isZk = true;
+        }
+        if ($isZk) {
+            header('Content-Type: text/html; charset=utf-8');
+            echo "<!DOCTYPE html><html lang='en' dir='ltr'><head><meta charset='UTF-8'><title>" . htmlspecialchars($note['title'], ENT_QUOTES, 'UTF-8') . "</title></head><body style='font-family:sans-serif; padding:2rem;'>";
+            echo "<h2>" . htmlspecialchars($note['title'], ENT_QUOTES, 'UTF-8') . "</h2>";
+            echo "<p><em>This note is Zero-Knowledge encrypted. Decryption must happen client-side with the passphrase.</em></p>";
+            echo "<hr><p style='white-space: pre-wrap;'>" . htmlspecialchars($note['encrypted_content'], ENT_QUOTES, 'UTF-8') . "</p>";
+            echo "<p><small>IV: " . htmlspecialchars($note['iv'] ?? '', ENT_QUOTES, 'UTF-8') . " Tag: " . htmlspecialchars($note['tag'] ?? '', ENT_QUOTES, 'UTF-8') . "</small></p>";
+            echo "</body></html>";
+            exit;
+        }
 
         header('Content-Type: text/html; charset=utf-8');
         echo "<!DOCTYPE html><html lang='en' dir='ltr'><head><meta charset='UTF-8'><title>" . htmlspecialchars($note['title'], ENT_QUOTES, 'UTF-8') . "</title></head><body style='font-family:sans-serif; padding:2rem;'>";
@@ -130,6 +151,73 @@ class ShareManager {
         echo "<hr><p style='white-space: pre-wrap;'>" . htmlspecialchars($plainText, ENT_QUOTES, 'UTF-8') . "</p>";
         echo "</body></html>";
         exit;
+    }
+
+    /**
+     * Get share info as JSON for public share view (share.html?token=...)
+     */
+    public function getShareInfo(string $token): array {
+        $stmt = $this->db->prepare("SELECT * FROM share_tokens WHERE token = ?");
+        $stmt->execute([$token]);
+        $share = $stmt->fetch();
+
+        if (!$share) {
+            return ['success' => false, 'message' => 'Invalid share link.'];
+        }
+        if (strtotime($share['expires_at']) < time()) {
+            return ['success' => false, 'message' => 'This link has expired.'];
+        }
+        if ($share['max_uses'] > 0 && $share['uses_count'] >= $share['max_uses']) {
+            return ['success' => false, 'message' => 'This link has reached its maximum usage limit.'];
+        }
+
+        $remaining = $share['max_uses'] > 0 ? max(0, $share['max_uses'] - $share['uses_count']) : -1;
+
+        if ($share['item_type'] === 'file') {
+            $stmt2 = $this->db->prepare("SELECT original_name, file_size, mime_type FROM files WHERE id = ?");
+            $stmt2->execute([$share['item_id']]);
+            $file = $stmt2->fetch();
+            if (!$file) return ['success' => false, 'message' => 'File not found.'];
+            return [
+                'success' => true,
+                'type' => 'file',
+                'expires_at' => $share['expires_at'],
+                'remaining_uses' => $remaining,
+                'file' => $file
+            ];
+        } else {
+            $stmt2 = $this->db->prepare("SELECT title, encrypted_content, iv, tag FROM notes WHERE id = ?");
+            $stmt2->execute([$share['item_id']]);
+            $note = $stmt2->fetch();
+            if (!$note) return ['success' => false, 'message' => 'Note not found.'];
+            // Detect ZK by attempting server decrypt; fallback to raw if fails
+            $isZk = false;
+            $content = $note['encrypted_content'];
+            if (!empty($note['iv'])) {
+                try {
+                    $content = Crypto::decryptText($note['encrypted_content'], $note['iv'], $note['tag'] ?? '');
+                } catch (Exception $e) {
+                    $isZk = true;
+                    $content = $note['encrypted_content'];
+                }
+            } else {
+                $isZk = true;
+            }
+            return [
+                'success' => true,
+                'type' => 'note',
+                'expires_at' => $share['expires_at'],
+                'remaining_uses' => $remaining,
+                'note' => [
+                    'title' => $note['title'],
+                    'content' => $content,
+                    'is_zk_encrypted' => $isZk,
+                    'iv' => $note['iv'] ?? '',
+                    'tag' => $note['tag'] ?? '',
+                    'encrypted_content' => $note['encrypted_content']
+                ]
+            ];
+        }
     }
 
     private function logAction(?int $userId, string $action): void {

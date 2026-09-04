@@ -34,9 +34,10 @@ class Vault {
 
         $stmt = $this->db->prepare("INSERT INTO folders (user_id, parent_id, name) VALUES (?, ?, ?)");
         $stmt->execute([$userId, $parentId, $name]);
+        $folderId = (int)$this->db->lastInsertId();
 
         $this->logAction($userId, 'CREATE_FOLDER');
-        return ['success' => true, 'message' => 'Folder created successfully.', 'folder_id' => $this->db->lastInsertId()];
+        return ['success' => true, 'message' => 'Folder created successfully.', 'folder_id' => $folderId];
     }
 
     public function getUserFolders(int $userId): array {
@@ -87,10 +88,11 @@ class Vault {
             "INSERT INTO notes (user_id, folder_id, title, encrypted_content, iv, tag, tags) VALUES (?, ?, ?, ?, ?, ?, ?)"
         );
         $stmt->execute([$userId, $folderId, $title, $ciphertext, $iv, $tag, $tags]);
+        $noteId = (int)$this->db->lastInsertId();
 
         $this->logAction($userId, 'CREATE_NOTE');
 
-        return ['success' => true, 'message' => 'Note saved successfully.', 'note_id' => $this->db->lastInsertId()];
+        return ['success' => true, 'message' => 'Note saved successfully.', 'note_id' => $noteId];
     }
 
     public function updateNote(int $userId, int $noteId, string $title, string $content, ?int $folderId = null, ?string $tags = null, bool $isClientEncrypted = false, ?string $customIv = null, ?string $customTag = null): array {
@@ -129,10 +131,17 @@ class Vault {
             return ['success' => false, 'message' => 'Note not found or you do not have permission.'];
         }
 
-        // Decrypt on server if IV is present; otherwise, return raw client-encrypted text for Zero-Knowledge
-        $plainContent = !empty($note['iv']) 
-            ? Crypto::decryptText($note['encrypted_content'], $note['iv'], $note['tag'] ?? '') 
-            : $note['encrypted_content'];
+        // Try server-side decrypt; if it fails (likely Zero-Knowledge), return raw ciphertext for client-side decrypt
+        $plainContent = $note['encrypted_content'];
+        $isZkFallback = false;
+        if (!empty($note['iv'])) {
+            try {
+                $plainContent = Crypto::decryptText($note['encrypted_content'], $note['iv'], $note['tag'] ?? '');
+            } catch (Exception $e) {
+                $plainContent = $note['encrypted_content'];
+                $isZkFallback = true;
+            }
+        }
 
         return [
             'success' => true,
@@ -145,6 +154,7 @@ class Vault {
                 'iv'                => $note['iv'],
                 'tag'               => $note['tag'] ?? '',
                 'tags'              => $note['tags'],
+                'is_zk_fallback'    => $isZkFallback,
                 'created_at'        => $note['created_at'],
                 'updated_at'        => $note['updated_at']
             ]
@@ -211,10 +221,20 @@ class Vault {
             $cryptoRes['tag'],
             $tags
         ]);
+        $fileId = (int)$this->db->lastInsertId();
 
         $this->logAction($userId, 'UPLOAD_FILE');
 
-        return ['success' => true, 'message' => 'File uploaded and encrypted successfully.'];
+        return ['success' => true, 'message' => 'File uploaded and encrypted successfully.', 'file_id' => $fileId];
+    }
+
+    // Backwards-compatible wrappers for API (soft-delete)
+    public function deleteFile(int $userId, int $fileId): array {
+        return $this->moveToTrash($userId, 'file', $fileId);
+    }
+
+    public function deleteNote(int $userId, int $noteId): array {
+        return $this->moveToTrash($userId, 'note', $noteId);
     }
 
     public function updateItemMetadata(int $userId, string $type, int $itemId, string $newName, ?int $folderId = null, ?string $tags = null): array {
