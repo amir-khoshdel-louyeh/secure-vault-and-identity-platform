@@ -172,7 +172,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function redirectToLogin() {
-        if (currentPage !== 'login.html' && currentPage !== 'index.html' && currentPage !== 'share.html') {
+        if (currentPage !== 'login.html' && currentPage !== 'register.html' && currentPage !== 'signup.html' && currentPage !== 'index.html' && currentPage !== 'share.html') {
             window.location.href = 'login.html';
         }
     }
@@ -261,7 +261,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 welcomeUserElem.innerText = `Welcome, ${res.user?.username || res.username}`;
             }
 
-            if (currentPage === 'login.html') {
+            if (currentPage === 'login.html' || currentPage === 'register.html' || currentPage === 'signup.html') {
                 window.location.href = 'dashboard.html';
             }
 
@@ -468,7 +468,7 @@ document.addEventListener('DOMContentLoaded', () => {
         confirmSavedCodesBtn.addEventListener('click', () => {
             document.getElementById('recovery-codes-display').style.display = 'none';
             alert('Please sign in using your username and password.');
-            window.location.reload();
+            window.location.href = 'login.html';
         });
     }
 
