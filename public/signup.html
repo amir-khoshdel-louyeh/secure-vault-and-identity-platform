@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="">
+    <title>Create Account - Secure Vault Platform</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <div class="container">
+        <!-- Main Header -->
+        <header>
+            <h1>Secure Vault & Identity Platform</h1>
+            <div style="display:flex;gap:10px;align-items:center;">
+                <a href="index.html" class="btn-secondary" style="text-decoration:none;">Welcome</a>
+                <a href="login.html" class="btn-primary" style="text-decoration:none;">Login</a>
+            </div>
+        </header>
+
+        <!-- Registration Section -->
+        <section id="auth-section">
+            <div class="auth-single">
+                <div class="auth-form">
+                    <h3>Create Account</h3>
+                    
+                    <!-- Alert Message Area -->
+                    <div id="register-alert" class="alert alert-danger" style="display: none;"></div>
+                    <div id="register-success" class="alert alert-success" style="display: none;"></div>
+
+                    <form id="register-form">
+                        <div class="form-group">
+                            <label for="reg-username">Username:</label>
+                            <input type="text" id="reg-username" name="username" required autocomplete="username">
+                        </div>
+                        <div class="form-group">
+                            <label for="reg-email">Email:</label>
+                            <input type="email" id="reg-email" name="email" required autocomplete="email">
+                        </div>
+                        <div class="form-group">
+                            <label for="reg-password">Password:</label>
+                            <input type="password" id="reg-password" name="password" minlength="8" required autocomplete="new-password">
+                            <small style="color:var(--text-muted);font-size:0.8rem;">Minimum 8 characters</small>
+                        </div>
+                        <button type="submit" class="btn-secondary" style="width:100%;">Register</button>
+                    </form>
+
+                    <!-- 2FA Setup During Registration -->
+                    <div id="reg-2fa-setup" style="display: none; margin-top: 20px;">
+                        <h4>Set up Two-Factor Authentication</h4>
+                        <p class="text-sm" style="font-size:0.88rem;color:var(--text-muted);margin:8px 0;">Scan the QR code below with your authenticator app.</p>
+                        
+                        <div id="reg-qr-wrapper" style="text-align: center; margin: 15px 0;"></div>
+                        <p class="text-sm" style="text-align: center; word-break: break-all;font-size:0.85rem;">Secret Key: <code id="reg-2fa-secret"></code></p>
+                        
+                        <form id="reg-2fa-form">
+                            <div class="form-group">
+                                <label for="reg-totp">Enter 6-digit code:</label>
+                                <input type="text" id="reg-totp" name="totp_code" placeholder="123456" maxlength="6" pattern="\d{6}" required autocomplete="one-time-code">
+                            </div>
+                            <button type="submit" class="btn-primary" style="width:100%;">Verify & Enable 2FA</button>
+                            <div class="form-sub-actions" style="margin-top:12px;text-align:center;">
+                                <button type="button" id="skip-2fa-btn" class="btn-link">Skip for now</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Display Recovery Codes Upon Successful Registration / 2FA Setup -->
+                    <div id="recovery-codes-display" class="card" style="display: none; margin-top:20px;">
+                        <h4>Save Your Recovery Codes</h4>
+                        <p class="text-sm" style="font-size:0.88rem;color:var(--text-muted);margin:8px 0;">Store these backup codes in a safe place. If you lose your 2FA device, you can use these to recover access:</p>
+                        <div id="codes-list-container" class="code-box" style="background:#f8fafc;border:1px solid var(--border-color);padding:12px;border-radius:8px;margin:12px 0;word-break:break-all;"></div>
+                        <button type="button" id="confirm-saved-codes-btn" class="btn-primary" style="width:100%;">I Have Saved These Codes</button>
+                    </div>
+                </div>
+
+                <div class="auth-switch">
+                    Already have an account? <a href="login.html">Login here</a> • <a href="index.html">Back to Welcome</a>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>

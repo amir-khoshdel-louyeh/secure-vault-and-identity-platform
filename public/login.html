@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="">
-    <title>Authentication - Secure Vault Platform</title>
+    <title>Login - Secure Vault Platform</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -13,18 +13,20 @@
         <!-- Main Header -->
         <header>
             <h1>Secure Vault & Identity Platform</h1>
+            <div style="display:flex;gap:10px;align-items:center;">
+                <a href="index.html" class="btn-secondary" style="text-decoration:none;">Welcome</a>
+                <a href="register.html" class="btn-primary" style="text-decoration:none;">Create Account</a>
+            </div>
         </header>
 
-        <!-- Authentication Section -->
+        <!-- Login Section -->
         <section id="auth-section">
-            <div class="auth-box">
-                
-                <!-- Login Container (Supports Two-Step Login & Recovery Codes) -->
+            <div class="auth-single">
                 <div class="auth-form">
                     <h3>Sign In</h3>
                     
                     <!-- Alert Message Area -->
-                    <div id="login-alert" class="alert-danger" style="display: none;"></div>
+                    <div id="login-alert" class="alert alert-danger" style="display: none;"></div>
 
                     <!-- STEP 1: Username & Password -->
                     <form id="login-step1-form">
@@ -36,7 +38,7 @@
                             <label for="login-password">Password:</label>
                             <input type="password" id="login-password" name="password" required autocomplete="current-password">
                         </div>
-                        <button type="submit" class="btn-primary">Next</button>
+                        <button type="submit" class="btn-primary" style="width:100%;">Next</button>
                     </form>
 
                     <!-- STEP 2: TOTP Authentication (Hidden by default, shown if 2FA is enabled) -->
@@ -48,9 +50,9 @@
                             <input type="text" id="login-totp" name="totp_code" placeholder="6-digit code" maxlength="6" pattern="\d{6}" autocomplete="one-time-code">
                         </div>
                         
-                        <button type="submit" class="btn-primary">Verify & Sign In</button>
+                        <button type="submit" class="btn-primary" style="width:100%;">Verify & Sign In</button>
                         
-                        <div class="form-sub-actions">
+                        <div class="form-sub-actions" style="margin-top:12px;text-align:center;">
                             <button type="button" id="toggle-recovery-btn" class="btn-link">Use Recovery Code instead</button>
                         </div>
                     </form>
@@ -64,69 +66,17 @@
                             <input type="text" id="recovery-code" name="recovery_code" placeholder="Enter your backup code" autocomplete="off" required>
                         </div>
                         
-                        <button type="submit" class="btn-warning">Recover Account & Sign In</button>
+                        <button type="submit" class="btn-warning" style="width:100%;background-color:var(--warning-color);color:#fff;">Recover Account & Sign In</button>
                         
-                        <div class="form-sub-actions">
+                        <div class="form-sub-actions" style="margin-top:12px;text-align:center;">
                             <button type="button" id="back-to-totp-btn" class="btn-link">Back to 2FA Code</button>
                         </div>
                     </form>
                 </div>
 
-                <div class="auth-divider"></div>
-
-                <!-- Registration Container -->
-                <div class="auth-form">
-                    <h3>Create Account</h3>
-                    
-                    <!-- Alert Message Area -->
-                    <div id="register-alert" class="alert-danger" style="display: none;"></div>
-                    <div id="register-success" class="alert-success" style="display: none;"></div>
-
-                    <form id="register-form">
-                        <div class="form-group">
-                            <label for="reg-username">Username:</label>
-                            <input type="text" id="reg-username" name="username" required autocomplete="username">
-                        </div>
-                        <div class="form-group">
-                            <label for="reg-email">Email:</label>
-                            <input type="email" id="reg-email" name="email" required autocomplete="email">
-                        </div>
-                        <div class="form-group">
-                            <label for="reg-password">Password:</label>
-                            <input type="password" id="reg-password" name="password" minlength="8" required autocomplete="new-password">
-                        </div>
-                        <button type="submit" class="btn-secondary">Register</button>
-                    </form>
-
-                    <!-- 2FA Setup During Registration -->
-                    <div id="reg-2fa-setup" style="display: none; margin-top: 20px;">
-                        <h4>Set up Two-Factor Authentication</h4>
-                        <p class="text-sm">Scan the QR code below with your authenticator app.</p>
-                        
-                        <div id="reg-qr-wrapper" style="text-align: center; margin: 15px 0;"></div>
-                        <p class="text-sm" style="text-align: center; word-break: break-all;">Secret Key: <code id="reg-2fa-secret"></code></p>
-                        
-                        <form id="reg-2fa-form">
-                            <div class="form-group">
-                                <label for="reg-totp">Enter 6-digit code:</label>
-                                <input type="text" id="reg-totp" name="totp_code" placeholder="123456" maxlength="6" pattern="\d{6}" required autocomplete="one-time-code">
-                            </div>
-                            <button type="submit" class="btn-primary">Verify & Enable 2FA</button>
-                            <div class="form-sub-actions">
-                                <button type="button" id="skip-2fa-btn" class="btn-link">Skip for now</button>
-                            </div>
-                        </form>
-                    </div>
-
-                    <!-- Display Recovery Codes Upon Successful Registration / 2FA Setup -->
-                    <div id="recovery-codes-display" class="card" style="display: none;">
-                        <h4>Save Your Recovery Codes</h4>
-                        <p class="text-sm">Store these backup codes in a safe place. If you lose your 2FA device, you can use these to recover access:</p>
-                        <div id="codes-list-container" class="code-box"></div>
-                        <button type="button" id="confirm-saved-codes-btn" class="btn-primary">I Have Saved These Codes</button>
-                    </div>
+                <div class="auth-switch">
+                    Don't have an account? <a href="register.html">Create one</a> • <a href="index.html">Back to Welcome</a>
                 </div>
-
             </div>
         </section>
     </div>
