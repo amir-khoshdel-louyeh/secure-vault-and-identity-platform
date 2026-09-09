@@ -401,26 +401,44 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             const alertBox = document.getElementById('register-alert');
             const successBox = document.getElementById('register-success');
+            const setupBox = document.getElementById('reg-2fa-setup');
+            const recoveryBox = document.getElementById('recovery-codes-display');
             alertBox.style.display = 'none';
             successBox.style.display = 'none';
+            // Clear stale state from any previous attempt so a failed
+            // retry can never show the old QR/secret ("already registered
+            // but I can still continue" confusion).
+            if (setupBox) setupBox.style.display = 'none';
+            if (recoveryBox) recoveryBox.style.display = 'none';
+            currentRegRecoveryCode = '';
 
-            const formData = new FormData(registerForm);
-            const res = await apiRequest('register', 'POST', formData);
+            const submitBtn = registerForm.querySelector('button[type="submit"]');
+            if (submitBtn) submitBtn.disabled = true;
+
+            let res;
+            try {
+                const formData = new FormData(registerForm);
+                res = await apiRequest('register', 'POST', formData);
+            } finally {
+                if (submitBtn) submitBtn.disabled = false;
+            }
 
             if (res && res.success) {
                 registerForm.style.display = 'none'; // Hide register form
-                
+
                 // Store recovery code for later
                 currentRegRecoveryCode = res.recovery_code || '';
-                
+
                 // Show 2FA Setup
-                const setupBox = document.getElementById('reg-2fa-setup');
                 if (setupBox) {
                     setupBox.style.display = 'block';
                     document.getElementById('reg-qr-wrapper').innerHTML = `<img src="${res.qr_code}" alt="2FA QR Code">`;
                     document.getElementById('reg-2fa-secret').innerText = res.secret;
                 }
             } else {
+                // Keep form visible and 2FA hidden: nothing was created.
+                registerForm.style.display = 'block';
+                if (setupBox) setupBox.style.display = 'none';
                 alertBox.innerText = res?.message || 'Registration failed.';
                 alertBox.style.display = 'block';
             }

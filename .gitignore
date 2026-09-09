@@ -20,6 +20,8 @@ Thumbs.db
 *.log
 
 
+__pycache__/
+
 # The storage folder and content
 uploads/
 
