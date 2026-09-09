@@ -8,8 +8,6 @@ A self-hosted PHP 8.1+ web application for storing and sharing **encrypted files
 
 ## System Demonstration
 
-![System Demonstration](assets/system-demonstration.gif)
-
 ### System Workflow
 
 ```text
@@ -35,14 +33,6 @@ A self-hosted PHP 8.1+ web application for storing and sharing **encrypted files
    ▼
 [JSON Response → Frontend (Vanilla JS + Web Crypto API)]
 ```
-
-### Agent / System Execution Demo
-
-![Execution Demo](assets/agent-demo.png)
-
-### Example Output
-
-![Example Output](assets/example-output.png)
 
 ---
 
@@ -224,9 +214,29 @@ mysql -u root -e "FLUSH PRIVILEGES;"
 
 ---
 
-## Example Output
+## Application Screenshots
 
-![Example Output](assets/output.png)
+### 1. Landing Page — Hero
+![Landing Hero - Your Data Encrypted](assets/landing-hero-your-data-encrypted.png)
+
+### 2. Landing Page — Features & How It Works
+![Landing Features and How It Works](assets/landing-features-how-it-works.png)
+
+### 3. Dashboard — Vault Storage (Files & Notes)
+![Dashboard Vault Storage](assets/dashboard-vault-storage-files-notes.png)
+
+### 4. Dashboard — Security & 2FA
+![Dashboard Security and 2FA](assets/dashboard-security-2fa-enabled.png)
+
+### 5. Dashboard — Active Device Sessions
+![Dashboard Active Sessions](assets/dashboard-active-device-sessions.png)
+
+### 6. Dashboard — Managed Share Links
+![Dashboard Managed Links](assets/dashboard-managed-share-links.png)
+
+---
+
+## Example Output
 
 ```text
 ✓ Account created — recovery code: XXXX-XXXX-XXXX-XXXX
