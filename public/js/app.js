@@ -922,6 +922,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('share-item-type').value = type;
                 document.getElementById('share-item-id').value = id;
                 document.getElementById('share-result-box').style.display = 'none';
+                const outputField = document.getElementById('share-url-output');
+                if (outputField) outputField.value = '';
+                const createBtn = document.getElementById('create-share-link-btn');
+                if (createBtn) { createBtn.disabled = false; createBtn.textContent = 'Create Link'; }
                 modal.style.display = 'flex';
             } else {
                 window.location.href = `share.html?type=${type}&id=${id}`;
@@ -945,11 +949,26 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Close Modal Button
+    // Close Modal Button (Cancel) — also resets form state for next use
     const closeModalBtn = document.getElementById('close-modal-btn');
     if (closeModalBtn) {
         closeModalBtn.addEventListener('click', () => {
             document.getElementById('share-modal').style.display = 'none';
+            document.getElementById('share-result-box').style.display = 'none';
+            const createBtn = document.getElementById('create-share-link-btn');
+            if (createBtn) { createBtn.disabled = false; createBtn.textContent = 'Create Link'; }
+        });
+    }
+
+    // Done Button — exit after link is created (resets state for next use)
+    const shareDoneBtn = document.getElementById('share-done-btn');
+    if (shareDoneBtn) {
+        shareDoneBtn.addEventListener('click', () => {
+            const modal = document.getElementById('share-modal');
+            if (modal) modal.style.display = 'none';
+            document.getElementById('share-result-box').style.display = 'none';
+            const createBtn = document.getElementById('create-share-link-btn');
+            if (createBtn) { createBtn.disabled = false; createBtn.textContent = 'Create Link'; }
         });
     }
 
@@ -957,6 +976,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (shareForm) {
         shareForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            const createBtn = document.getElementById('create-share-link-btn');
+            // Use the actual submit button on either page (dashboard modal or share.html)
+            const submitter = e.submitter || createBtn;
+            // Prevent duplicate links from repeated / double clicks
+            if (submitter && submitter.disabled) return;
+            const originalText = submitter ? submitter.textContent : '';
+            if (submitter) { submitter.disabled = true; submitter.textContent = 'Creating...'; }
+            if (createBtn && createBtn !== submitter) { createBtn.disabled = true; }
             const formData = new FormData(shareForm);
             const res = await apiRequest('create_share_link', 'POST', formData);
 
@@ -978,11 +1005,16 @@ document.addEventListener('DOMContentLoaded', () => {
                         alert('Share URL copied to clipboard!');
                     };
                 }
+                // Keep Create disabled until Done/Cancel — one submit = one link
+                if (submitter) submitter.textContent = 'Link Created';
+                if (createBtn && createBtn !== submitter) { createBtn.textContent = 'Link Created'; }
                 // Refresh managed links if on dashboard
                 if (typeof loadLinks === 'function') {
                     try { loadLinks(); } catch {}
                 }
             } else {
+                if (submitter) { submitter.disabled = false; submitter.textContent = originalText || 'Create Link'; }
+                if (createBtn && createBtn !== submitter) { createBtn.disabled = false; createBtn.textContent = 'Create Link'; }
                 alert(res?.message || 'Failed to generate share link.');
             }
         });
