@@ -817,7 +817,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 type: e.target.dataset.type,
                 item_id: e.target.dataset.id
             });
-            if (res && res.success) loadTrash();
+            if (res && res.success) {
+                loadTrash();
+                loadFiles();
+                loadNotes();
+            }
             else alert(res?.message || 'Restore failed.');
         }
 

@@ -316,8 +316,26 @@ class Vault {
     }
 
     public function restoreFromTrash(int $userId, string $type, int $itemId): array {
+        if (!in_array($type, ['file', 'note'], true)) {
+            return ['success' => false, 'message' => 'Invalid item type.'];
+        }
+        if ($itemId <= 0) {
+            return ['success' => false, 'message' => 'Invalid item ID.'];
+        }
         $table = ($type === 'file') ? 'files' : 'notes';
-        $stmt = $this->db->prepare("UPDATE {$table} SET is_deleted = 0, deleted_at = NULL WHERE id = ? AND user_id = ?");
+
+        // Verify ownership first (distinguishes "not found" from "already restored")
+        $check = $this->db->prepare("SELECT id, is_deleted FROM {$table} WHERE id = ? AND user_id = ?");
+        $check->execute([$itemId, $userId]);
+        $row = $check->fetch();
+        if (!$row) {
+            return ['success' => false, 'message' => 'Item not found in trash.'];
+        }
+        if ((int)$row['is_deleted'] === 0) {
+            return ['success' => true, 'message' => 'Item is already restored.'];
+        }
+
+        $stmt = $this->db->prepare("UPDATE {$table} SET is_deleted = 0, deleted_at = NULL WHERE id = ? AND user_id = ? AND is_deleted = 1");
         $stmt->execute([$itemId, $userId]);
 
         if ($stmt->rowCount() === 0) {
